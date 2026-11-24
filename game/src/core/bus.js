@@ -1,11 +1,10 @@
-export function createBus() {
-  const m = new Map();
-  return {
-    on(e, f) {
-      if (!m.has(e)) m.set(e, []);
-      m.get(e).push(f);
-      return () => { const l = m.get(e) || [], i = l.indexOf(f); if (i >= 0) l.splice(i, 1); };
-    },
-    emit(e, d) { const l = m.get(e); if (l) for (const f of [...l]) f(d); },
+export function createBus(g) {
+  const map = new Map();
+  const bus = {
+    on(ev, fn) { if (!map.has(ev)) map.set(ev, []); map.get(ev).push(fn); },
+    emit(ev, data) { const l = map.get(ev); if (!l) return; for (const fn of l.slice()) fn(data); },
+    off(ev, fn) { const l = map.get(ev); if (!l) return; const i = l.indexOf(fn); if (i >= 0) l.splice(i, 1); }
   };
+  g.bus = bus;
+  return bus;
 }

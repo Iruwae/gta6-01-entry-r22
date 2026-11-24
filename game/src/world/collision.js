@@ -1,72 +1,68 @@
-export function createCollision(cellSize = 32) {
+export function createCollision(g) {
+  const CELL = 32;
   const cells = new Map();
-  const key = (x, z) => `${Math.floor(x / cellSize)},${Math.floor(z / cellSize)}`;
-  const boxes = [];
-  function registerBox(x1, z1, x2, z2, height, tag = 'solid') {
-    const b = { x1: Math.min(x1, x2), z1: Math.min(z1, z2), x2: Math.max(x1, x2), z2: Math.max(z1, z2), height, tag };
-    boxes.push(b);
-    const cx1 = Math.floor(b.x1 / cellSize);
-    const cx2 = Math.floor(b.x2 / cellSize);
-    const cz1 = Math.floor(b.z1 / cellSize);
-    const cz2 = Math.floor(b.z2 / cellSize);
-    for (let cx = cx1; cx <= cx2; cx++) {
-      for (let cz = cz1; cz <= cz2; cz++) {
-        const k = `${cx},${cz}`;
+  const key = (cx, cz) => cx + ':' + cz;
+  const col = {
+    boxes: [],
+    add(x, z, hw, hd, h, thin) {
+      const b = {x, z, hw, hd, h, thin: !!thin};
+      col.boxes.push(b);
+      const x0 = Math.floor((x - hw) / CELL), x1 = Math.floor((x + hw) / CELL);
+      const z0 = Math.floor((z - hd) / CELL), z1 = Math.floor((z + hd) / CELL);
+      for (let cx = x0; cx <= x1; cx++) for (let cz = z0; cz <= z1; cz++) {
+        const k = key(cx, cz);
         if (!cells.has(k)) cells.set(k, []);
         cells.get(k).push(b);
       }
-    }
-    return b;
-  }
-  function boxesNear(x, z) {
-    return cells.get(key(x, z)) || [];
-  }
-  function solidAt(x, z, margin = 0) {
-    for (const b of boxesNear(x, z)) {
-      if (b.tag === 'slim') continue;
-      if (x > b.x1 - margin && x < b.x2 + margin && z > b.z1 - margin && z < b.z2 + margin) return b;
-    }
-    return null;
-  }
-  function lineOfSight(ax, az, bx, bz, eyeHeight = 2) {
-    const len = Math.hypot(bx - ax, bz - az);
-    const steps = Math.max(1, Math.ceil(len / 4));
-    for (let s = 1; s < steps; s++) {
-      const t = s / steps;
-      const hit = solidAt(ax + (bx - ax) * t, az + (bz - az) * t);
-      if (hit && hit.height > eyeHeight) return false;
-    }
-    return true;
-  }
-  function resolveCircle(body, radius, feetY = 0) {
-    let normal = null;
-    for (const b of boxesNear(body.x, body.z)) {
-      if (b.height <= feetY) continue;
-      const nearX = Math.min(b.x2, Math.max(b.x1, body.x));
-      const nearZ = Math.min(b.z2, Math.max(b.z1, body.z));
-      let dx = body.x - nearX;
-      let dz = body.z - nearZ;
-      const distSq = dx * dx + dz * dz;
-      if (distSq >= radius * radius) continue;
-      if (distSq > 1e-6) {
-        const dist = Math.sqrt(distSq);
-        dx /= dist; dz /= dist;
-        body.x = nearX + dx * radius;
-        body.z = nearZ + dz * radius;
-        normal = { x: dx, z: dz, depth: radius - dist };
-      } else {
-        const exits = [body.x - b.x1, b.x2 - body.x, body.z - b.z1, b.z2 - body.z];
-        const side = exits.indexOf(Math.min(...exits));
-        dx = side === 0 ? -1 : side === 1 ? 1 : 0;
-        dz = side === 2 ? -1 : side === 3 ? 1 : 0;
-        if (side === 0) body.x = b.x1 - radius;
-        else if (side === 1) body.x = b.x2 + radius;
-        else if (side === 2) body.z = b.z1 - radius;
-        else body.z = b.z2 + radius;
-        normal = { x: dx, z: dz, depth: radius };
+      return b;
+    },
+    near(x, z) {
+      const cx = Math.floor(x / CELL), cz = Math.floor(z / CELL);
+      const out = [];
+      for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) {
+        const l = cells.get(key(cx + a, cz + b));
+        if (l) for (const bb of l) if (!out.includes(bb)) out.push(bb);
       }
+      return out;
+    },
+    solidAt(x, z, m = 0) {
+      for (const b of col.near(x, z)) if (Math.abs(x - b.x) < b.hw + m && Math.abs(z - b.z) < b.hd + m) return b;
+      return null;
+    },
+    resolveCircle(p, r, feet = 0) {
+      let px = 0, pz = 0, hit = false;
+      for (const b of col.near(p.x, p.z)) {
+        if (b.h <= feet) continue;
+        const nx = Math.max(b.x - b.hw, Math.min(p.x, b.x + b.hw));
+        const nz = Math.max(b.z - b.hd, Math.min(p.z, b.z + b.hd));
+        let dx = p.x - nx, dz = p.z - nz;
+        let d2 = dx * dx + dz * dz;
+        if (d2 > r * r) continue;
+        hit = true;
+        if (d2 < 1e-6) {
+          const ex = b.hw + r - Math.abs(p.x - b.x), ez = b.hd + r - Math.abs(p.z - b.z);
+          if (ex < ez) { dx = p.x < b.x ? -1 : 1; dz = 0; px += dx * ex; }
+          else { dx = 0; dz = p.z < b.z ? -1 : 1; pz += dz * ez; }
+        } else {
+          const d = Math.sqrt(d2);
+          px += (dx / d) * (r - d); pz += (dz / d) * (r - d);
+        }
+      }
+      if (hit) { p.x += px; p.z += pz; }
+      return hit;
+    },
+    lineOfSight(ax, az, bx, bz, eye = 1.6) {
+      const dx = bx - ax, dz = bz - az;
+      const dist = Math.hypot(dx, dz);
+      const steps = Math.max(1, Math.floor(dist / 4));
+      for (let i = 1; i < steps; i++) {
+        const t = i / steps;
+        const b = col.solidAt(ax + dx * t, az + dz * t, 0);
+        if (b && b.h > eye) return false;
+      }
+      return true;
     }
-    return normal;
-  }
-  return { registerBox, boxesNear, solidAt, lineOfSight, resolveCircle, boxes };
+  };
+  g.collision = col;
+  return col;
 }

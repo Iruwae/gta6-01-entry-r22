@@ -49,7 +49,7 @@ async function evalJs(expression) {
 // Each stage runs inside the page against window.__game. Synchronous:
 // manual g.fixedStep(1/60) calls advance the real sim deterministically.
 const STAGE = {
-  '1-chase.jpg': `(() => {
+  's1-chase.jpg': `(() => {
     const g = window.__game;
     g.menus.hideTitle();
     g.mode = 'play'; g.introShown = true;
@@ -79,7 +79,7 @@ const STAGE = {
     g.render();
     return 'chase speed=' + Math.round(g.player.vehicle.speed * 2.237) + 'mph units=' + g.dispatch.units.length + ' at=' + Math.round(p.x) + ',' + Math.round(p.z);
   })()`,
-  '2-shootout.jpg': `(() => {
+  's2-shootout.jpg': `(() => {
     const g = window.__game;
     g.menus.hideTitle();
     g.mode = 'play'; g.introShown = true;
@@ -107,7 +107,7 @@ const STAGE = {
     g.render();
     return 'shootout npcs=' + g.pedestrians.npcs.length + ' wanted=' + g.wanted.level;
   })()`,
-  '3-stats.jpg': `(() => {
+  's3-stats.jpg': `(() => {
     const g = window.__game;
     g.player.placeAt(-300, 60, 0);
     g.player.money = 2840;
@@ -128,12 +128,12 @@ const STAGE = {
     g.render();
     return 'stats money=' + g.player.money + ' rp=' + g.respect.rp;
   })()`,
-  '4-title.jpg': `(() => {
+  's4-title.jpg': `(() => {
     const g = window.__game;
     return 'title mode=' + g.mode;
   })()`,
 };
-const SETTLE_MS = { '1-chase.jpg': 900, '2-shootout.jpg': 150, '3-stats.jpg': 900, '4-title.jpg': 2500 };
+const SETTLE_MS = { 's1-chase.jpg': 900, 's2-shootout.jpg': 150, 's3-stats.jpg': 900, 's4-title.jpg': 2500 };
 
 async function main() {
   mkdirSync(outDir, { recursive: true });

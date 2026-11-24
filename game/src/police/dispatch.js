@@ -1,169 +1,131 @@
 import * as THREE from 'three';
-import { stepVehicle } from '../vehicles/carPhysics.js';
-const UNIT_NAMES = ['TIDE-12', 'SURF-07', 'REEF-22', 'CORAL-48', 'PIER-05', 'TIDE-02', 'SURF-31', 'REEF-09', 'CORAL-85', 'PIER-14', 'TIDE-37', 'SURF-19'];
-const TACTICS = ['RAMMING', 'FLANKING', 'FIRING', 'PURSUIT', 'CLOSING IN'];
-export function createPoliceDispatch(game) {
-  const { plan, fleet, rng, scene } = game;
-  const units = [];
-  const rb = [];
-  let nameIdx = 0;
-  const hg = new THREE.Group();
-  {
-    const body = new THREE.Mesh(new THREE.BoxGeometry(4.4, 1.6, 2.2), new THREE.MeshStandardMaterial({ color: 0x2a4a6a, roughness: 0.5 }));
-    hg.add(body);
-    const glass = new THREE.Mesh(new THREE.BoxGeometry(1.8, 1, 2), new THREE.MeshStandardMaterial({ color: 0x9fd4ff, roughness: 0.2, metalness: 0.6 }));
-    glass.position.set(1.4, 0.2, 0);
-    hg.add(glass);
-    const rotor = new THREE.Mesh(new THREE.BoxGeometry(9, 0.12, 0.6), new THREE.MeshStandardMaterial({ color: 0x1a1d24 }));
-    rotor.position.y = 1.1;
-    hg.add(rotor);
-    hg.userData.rotor = rotor;
-    const tail = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.5, 0.5), new THREE.MeshStandardMaterial({ color: 0x2a4a6a }));
-    tail.position.set(-3.6, 0.3, 0);
-    hg.add(tail);
-    const coneGeo = new THREE.ConeGeometry(9, 26, 16, 1, true);
-    const coneMat = new THREE.MeshBasicMaterial({ color: 0xfff2c8, transparent: true, opacity: 0.16, side: THREE.DoubleSide, depthWrite: false });
-    const cone = new THREE.Mesh(coneGeo, coneMat);
-    cone.position.y = -14;
-    cone.rotation.x = Math.PI;
-    hg.add(cone);
-    const spot = new THREE.SpotLight(0xfff2c8, 60, 60, 0.5, 0.5);
-    spot.position.set(0, -1, 0);
-    spot.target.position.set(0, -26, 0);
-    hg.add(spot);
-    hg.add(spot.target);
-    hg.visible = false;
-    scene.add(hg);
-  }
-  const hel = {
-    group: hg,
-    position: { x: 0, y: 40, z: 0 },
-    active: false,
-    placeNear(player, back = 0.25) {
-      hel.position.x = player.position.x - Math.sin(player.heading) * 40 * back - 6;
-      hel.position.z = player.position.z - Math.cos(player.heading) * 40 * back - 4;
-      hel.position.y = 42;
-      hel.active = true;
-      hg.visible = true;
+const NAMES = ['TIDE-12', 'SURF-07', 'REEF-22', 'GULL-04', 'CORAL-19', 'BAY-31'];
+const TACTICS = ['FLANKING', 'FIRING', 'RAMMING', 'CLOSING IN', 'ROADBLOCK', 'SPOTLIGHT'];
+const vp = (v) => v.pos || v.position;
+export function createDispatch(g) {
+  const rng = g.rng.fork('dispatch');
+  const d = {
+    units: [],
+    heli: null, heliT: 0, rbT: 0, roadblock: null, spawnT: 0,
+    spawnUnit(kind = 'interceptor') {
+      const p = g.player.pos;
+      const a = rng.float(0, Math.PI * 2);
+      const dd = rng.float(110, 200);
+      const x = p.x + Math.cos(a) * dd, z = p.z + Math.sin(a) * dd;
+      const jn = g.plan.nearestJunction(x, z);
+      const v = g.fleet.spawn(kind, jn.x, jn.z, rng.float(0, Math.PI * 2));
+      v.parked = false;
+      v.cruise = 16;
+      const u = {
+        name: NAMES[d.units.length % NAMES.length],
+        tactic: rng.pick(TACTICS),
+        vehicle: v, from: jn, to: jn, along: 0, stuckT: 0, revT: 0,
+        dist() { return Math.round(Math.hypot(vp(v).x - p.x, vp(v).z - p.z)); }
+      };
+      v.ai = (vv, dt) => d.driveUnit(u, dt);
+      d.units.push(u);
+      return u;
     },
-    aimAt(player) {
-      hg.lookAt(player.position.x, 0, player.position.z);
-    },
-    fireAt(player) {
-      game.bus.emit('gunfire', { from: 'heli', at: player.position });
-    },
-    step(dt, time) {
-      if (!hel.active) return;
-      hg.userData.rotor.rotation.y += dt * 22;
-      const p = game.player;
-      const tx = p.position.x - Math.sin(p.heading) * 10;
-      const tz = p.position.z - Math.cos(p.heading) * 10;
-      hel.position.x += (tx - hel.position.x) * Math.min(1, dt * 0.8);
-      hel.position.z += (tz - hel.position.z) * Math.min(1, dt * 0.8);
-      hg.position.set(hel.position.x, 42 + Math.sin(time * 0.8) * 1.5, hel.position.z);
-      hg.lookAt(p.position.x, 0, p.position.z);
-    },
-    hide() { hel.active = false; hg.visible = false; },
-  };
-  function mkUnit(v, tactic) {
-    const unit = { vehicle: v, name: UNIT_NAMES[nameIdx++ % UNIT_NAMES.length], tactic, from: plan.nearestJunction(v.position.x, v.position.z).id, to: plan.nearestJunction(game.player.position.x, game.player.position.z).id, along: 0, searchX: 0, searchZ: 0 };
-    units.push(unit);
-    return unit;
-  }
-  function spawnUnit(specKey = 'interceptor') {
-    const hq = plan.placeById.get('hq');
-    const v = fleet.spawn(specKey, hq.x + rng.range(-10, 10), hq.z + rng.range(-10, 10), rng.range(0, 6));
-    v.parked = false;
-    return mkUnit(v, rng.pick(TACTICS));
-  }
-  function takeUpPursuit(v) { return mkUnit(v, 'RAMMING'); }
-  function clearRoadblocks() {
-    for (const r of [...rb]) { scene.remove(r.mesh); fleet.remove(r.vehicle); rb.splice(rb.indexOf(r), 1); }
-  }
-  function clearUnits() {
-    for (const u of [...units]) {
-      fleet.remove(u.vehicle);
-      units.splice(units.indexOf(u), 1);
-    }
-    hel.hide();
-    clearRoadblocks();
-  }
-  function placeRoadblock(count = 1) {
-    const p = game.player;
-    const ahead = plan.nearestJunction(p.position.x + Math.sin(p.heading) * 120, p.position.z + Math.cos(p.heading) * 120);
-    for (let i = 0; i < count; i++) {
-      const x = ahead.x + rng.range(-14, 14);
-      const z = ahead.z + rng.range(-14, 14);
-      const car = fleet.spawn('bulwark', x, z, rng.range(0, 6));
-      car.parked = true;
-      const barrier = new THREE.Mesh(new THREE.BoxGeometry(7, 1, 0.4), new THREE.MeshStandardMaterial({ color: 0xff7a2e }));
-      barrier.position.set(x, 1, z);
-      barrier.rotation.y = rng.range(0, 3);
-      scene.add(barrier);
-      rb.push({ x, z, mesh: barrier, vehicle: car });
-      game.bus.emit('roadblock', { x, z });
-    }
-  }
-  function rowsForHud() {
-    const tp = game.player.vehicle ? game.player.vehicle.position : game.player.position;
-    return units.slice(0, 5).map((u) => {
-      const d = Math.round(Math.hypot(u.vehicle.position.x - tp.x, u.vehicle.position.z - tp.z));
-      return { name: u.name, dist: d, tactic: u.tactic };
-    });
-  }
-  function step(dt) {
-    const wanted = game.wanted.level;
-    const wantUnits = wanted === 0 ? 0 : [0, 1, 2, 3, 4, 6][wanted];
-    while (units.length < wantUnits) spawnUnit(rng.chance(0.25) ? 'bulwark' : 'interceptor');
-    while (units.length > wantUnits) {
-      const u = units.pop();
-      fleet.remove(u.vehicle);
-    }
-    if (wanted >= 4) hel.active = true, hel.group.visible = true;
-    else if (wanted < 4) hel.hide();
-    if (wanted >= 3 && rb.length === 0) placeRoadblock(1);
-    if (wanted < 3) clearRoadblocks();
-    const p = game.player;
-    let anySees = false;
-    for (const u of units) {
+    driveUnit(u, dt) {
       const v = u.vehicle;
-      if (v.wrecked) continue;
-      const tp = p.vehicle ? p.vehicle.position : p.position;
-      const dx = tp.x - v.position.x;
-      const dz = tp.z - v.position.z;
-      const dist = Math.hypot(dx, dz);
-      const sees = dist < 90 && game.collision.lineOfSight(v.position.x, v.position.z, tp.x, tp.z, 2);
-      if (sees) anySees = true;
-      if (u.tactic === 'FLANKING' && dist > 40) {
-        const j = plan.nearestJunction(tp.x + 90, tp.z);
-        u.to = j.id;
-      } else {
-        u.to = plan.pursuitNext(u.from, u.to, tp.x, tp.z);
-      }
-      const pt = plan.pointAlongRoad(u.from, u.to, u.along);
-      if (!pt) { u.from = u.to; u.along = 0; continue; }
-      const wantHeading = Math.atan2(pt.x - v.position.x, pt.z - v.position.z);
-      let dh = wantHeading - v.heading;
+      const p = g.player.pos;
+      const dist = Math.hypot(vp(v).x - p.x, vp(v).z - p.z);
+      if (dist > 300) { d.removeUnit(u); return; }
+      const lead = 0.9;
+      const tx = p.x + (g.player.vehicle ? g.player.vehicle.velocity.x * lead : 0);
+      const tz = p.z + (g.player.vehicle ? g.player.vehicle.velocity.z * lead : 0);
+      const want = Math.atan2(tx - vp(v).x, tz - vp(v).z);
+      let dh = want - v.heading;
       while (dh > Math.PI) dh -= Math.PI * 2;
       while (dh < -Math.PI) dh += Math.PI * 2;
-      const steer = Math.max(-1, Math.min(1, dh * 2.4));
-      let forward = 1;
-      if (dist < 6) forward = 0.4;
-      stepVehicle(v, { forward, steer, handbrake: false }, dt, plan.groundHeight, game.collision);
-      u.along += Math.max(0, v.speed) * dt;
-      const segLen = Math.hypot(plan.byId.get(u.to).x - plan.byId.get(u.from).x, plan.byId.get(u.to).z - plan.byId.get(u.from).z);
-      if (u.along >= segLen) { u.from = u.to; u.along = 0; }
-      if (p.vehicle && dist < 3.6) {
-        p.vehicle.condition = Math.max(0, p.vehicle.condition - 14 * dt);
-        p.vehicle.health = Math.max(0, p.vehicle.health - 10 * dt);
-        v.velocity.x *= 0.6; v.velocity.z *= 0.6;
+      const inp = {forward: true, back: false, left: dh > 0.1, right: dh < -0.1, brake: Math.abs(dh) > 1.1, handbrake: false};
+      if (dist < 12 && u.tactic === 'RAMMING') inp.forward = true;
+      if (u.revT > 0) { u.revT -= dt; inp.forward = false; inp.back = true; }
+      else if (Math.abs(v.speed) < 0.5) { u.stuckT += dt; if (u.stuckT > 2.2) { u.revT = 1.3; u.stuckT = 0; } }
+      else u.stuckT = 0;
+      g.carPhysics.step(v, inp, dt);
+      if (dist < 4 && g.player.vehicle) {
+        g.carPhysics.damage(g.player.vehicle, 8 * dt * 10);
       }
-      if (u.tactic === 'FIRING' && dist < 30 && sees && rng.chance(dt * 0.5)) {
-        game.combat.npcShoot(v.position, tp, 6);
+    },
+    removeUnit(u) {
+      const i = d.units.indexOf(u);
+      if (i >= 0) d.units.splice(i, 1);
+      g.fleet.remove(u.vehicle);
+    },
+    clear() {
+      for (const u of d.units.slice()) d.removeUnit(u);
+      if (d.heli) { g.scene.remove(d.heli.mesh); d.heli = null; }
+      if (d.roadblock) { for (const v of d.roadblock) g.fleet.remove(v); d.roadblock = null; }
+    },
+    update(dt) {
+      const stars = g.wanted ? g.wanted.stars : 0;
+      const want = [0, 1, 2, 3, 4, 5][stars];
+      d.spawnT -= dt;
+      if (d.units.length < want && d.spawnT <= 0) {
+        d.spawnT = Math.max(1.2, 4.5 - 0.6 * stars);
+        d.spawnUnit(stars >= 4 ? 'bulwark' : 'interceptor');
+      }
+      while (d.units.length > want) d.removeUnit(d.units[d.units.length - 1]);
+      if (stars >= 3 && !d.heli) {
+        const mesh = new THREE.Group();
+        const body = new THREE.Mesh(new THREE.BoxGeometry(3.4, 1.4, 8), new THREE.MeshStandardMaterial({color: 0x2a3a4a, roughness: 0.5}));
+        mesh.add(body);
+        const rotor = new THREE.Mesh(new THREE.BoxGeometry(14, 0.12, 0.5), new THREE.MeshStandardMaterial({color: 0x1a1a1a}));
+        rotor.position.y = 1;
+        mesh.add(rotor);
+        mesh.userData.rotor = rotor;
+        const cone = new THREE.Mesh(new THREE.ConeGeometry(6, 30, 12, 1, true), new THREE.MeshBasicMaterial({color: 0xfff2c0, transparent: true, opacity: 0.14, side: THREE.DoubleSide, depthWrite: false}));
+        cone.rotation.x = Math.PI;
+        cone.position.y = -15;
+        mesh.add(cone);
+        mesh.position.set(g.player.pos.x + 260, 90, g.player.pos.z - 200);
+        g.scene.add(mesh);
+        d.heli = {mesh, a: 0, shots: 0, cd: 0};
+      }
+      if (d.heli) {
+        if (stars < 3) { g.scene.remove(d.heli.mesh); d.heli = null; }
+        else {
+          const h = d.heli;
+          h.a += dt * 0.32;
+          const p = g.player.pos;
+          h.mesh.position.set(p.x + Math.cos(h.a) * 30, 24, p.z + Math.sin(h.a) * 30);
+          h.mesh.lookAt(p.x, 0, p.z);
+          h.mesh.userData.rotor.rotation.y += dt * 34;
+          h.cd -= dt;
+          if (stars >= 4 && h.cd <= 0 && Math.hypot(h.mesh.position.x - p.x, h.mesh.position.z - p.z) < 60) {
+            h.cd = stars >= 5 ? 0.22 : 0.4;
+            h.shots++;
+            if (h.shots % 9 === 0) h.cd += 2.4;
+            if (g.effects) g.effects.tracer(h.mesh.position, p.clone().add(new THREE.Vector3(0, 1, 0)));
+            if (Math.random() < 0.3) g.player.damage(8);
+          }
+        }
+      }
+      d.rbT -= dt;
+      if (stars >= 3 && !d.roadblock && d.rbT <= 0) {
+        d.rbT = 16;
+        const p = g.player.pos;
+        const hd = g.player.vehicle ? g.player.vehicle.heading : g.player.heading;
+        const bx = p.x + Math.sin(hd) * 140, bz = p.z + Math.cos(hd) * 140;
+        const jn = g.plan.nearestJunction(bx, bz);
+        const v1 = g.fleet.spawn('interceptor', jn.x - 6, jn.z, hd + Math.PI / 2);
+        const v2 = g.fleet.spawn('interceptor', jn.x + 6, jn.z, hd + Math.PI / 2);
+        v1.parked = true; v2.parked = true;
+        d.roadblock = [v1, v2];
+        if (g.hud) g.hud.notify('Roadblock ahead');
+      }
+      if (d.roadblock) {
+        const p = g.player.pos;
+        const rp0 = vp(d.roadblock[0]);
+        const dd = Math.hypot(rp0.x - p.x, rp0.z - p.z);
+        if (dd < 14 || stars < 3) {
+          for (const v of d.roadblock) g.fleet.remove(v);
+          d.roadblock = null;
+        }
       }
     }
-    hel.step(dt, game.time);
-    return anySees;
-  }
-  return { units, rb, helicopter: hel, spawnUnit, takeUpPursuit, clearUnits, placeRoadblock, rowsForHud, step };
+  };
+  g.dispatch = d;
+  return d;
 }

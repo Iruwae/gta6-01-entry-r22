@@ -1,99 +1,69 @@
-export const CAR_SPECS = {
-  comet: { name: 'SOLMAR COMET', top: 34, accel: 16, grip: 8.5, color: '#c93a3a', price: 0 },
-  tide: { name: 'TIDE RUNNER', top: 30, accel: 14, grip: 8, color: '#3a7ac9', price: 1200 },
-  coral: { name: 'CORAL CRUISER', top: 28, accel: 12, grip: 7.5, color: '#e8a83a', price: 2400 },
-  marisol: { name: 'MARISOL GT', top: 40, accel: 20, grip: 9.5, color: '#ff7a2e', price: 8500 },
-  phantom: { name: 'VANE PHANTOM', top: 44, accel: 23, grip: 10, color: '#d8b45a', price: 22000 },
-  taxi: { name: 'SUNLINE CAB', top: 26, accel: 11, grip: 7, color: '#ffd23d', price: 0 },
-  van: { name: 'TIDE VAN', top: 24, accel: 10, grip: 6.5, color: '#8a8a82', price: 0 },
-  interceptor: { name: 'SBPD INTERCEPTOR', top: 38, accel: 19, grip: 9.5, color: '#f0f0f0', price: 0 },
-  bulwark: { name: 'SBPD BULWARK', top: 30, accel: 13, grip: 7, color: '#3a3f4a', price: 0 },
-};
-export function createVehicle(specKey, x, z, heading) {
-  const spec = CAR_SPECS[specKey] || CAR_SPECS.comet;
-  return {
-    specKey, spec,
-    position: { x, z },
-    heading,
-    velocity: { x: 0, z: 0 },
-    steer: 0,
-    speed: 0,
-    condition: 100,
-    health: 100,
-    burnTimer: 0,
-    parked: true,
-    driver: null,
-    stolenByPlayer: false,
-    missionKey: null,
-    color: spec.color,
-    length: 4.4,
-    width: 2,
-  };
-}
-export function stepVehicle(v, input, dt, groundHeight, collide) {
-  const spec = v.spec;
-  const forward = input.forward || 0;
-  const steerIn = input.steer || 0;
-  const handbrake = !!input.handbrake;
-  const dirX = Math.sin(v.heading);
-  const dirZ = Math.cos(v.heading);
-  let speed = v.velocity.x * dirX + v.velocity.z * dirZ;
-  if (forward > 0) speed += spec.accel * forward * dt * (speed < 0 ? 2.2 : 1);
-  else if (forward < 0) speed += spec.accel * forward * dt * 1.6;
-  speed -= speed * 0.55 * dt;
-  if (handbrake) speed -= speed * 1.8 * dt;
-  speed = Math.max(-12, Math.min(spec.top * (v.condition / 100 * 0.5 + 0.5), speed));
-  const steerTarget = steerIn * (handbrake ? 1.5 : 1) * Math.max(0.25, 1 - Math.abs(speed) / (spec.top * 1.6));
-  v.steer += (steerTarget - v.steer) * Math.min(1, dt * 8);
-  if (Math.abs(speed) > 0.5) {
-    v.heading += v.steer * (speed / spec.top) * spec.grip * 0.28 * dt * (speed < 0 ? -1 : 1);
-  }
-  const ndx = Math.sin(v.heading);
-  const ndz = Math.cos(v.heading);
-  const latX = v.velocity.x - (v.velocity.x * ndx + v.velocity.z * ndz) * ndx;
-  const latZ = v.velocity.z - (v.velocity.x * ndx + v.velocity.z * ndz) * ndz;
-  const gripK = Math.exp(-(handbrake ? spec.grip * 0.4 : spec.grip) * dt);
-  v.velocity.x = ndx * speed + latX * gripK;
-  v.velocity.z = ndz * speed + latZ * gripK;
-  v.position.x += v.velocity.x * dt;
-  v.position.z += v.velocity.z * dt;
-  v.speed = Math.hypot(v.velocity.x, v.velocity.z);
-  const gy = groundHeight ? groundHeight(v.position.x, v.position.z) : 0;
-  v.y = gy;
-  if (collide) {
-    const hit = collide.resolveCircle(v.position, 1.6, gy);
-    if (hit && v.speed > 4) {
-      v.condition = Math.max(0, v.condition - v.speed * 0.4);
-      v.health = Math.max(0, v.health - v.speed * 0.5);
-      v.velocity.x *= 0.4; v.velocity.z *= 0.4;
-    } else if (hit) {
-      v.velocity.x *= 0.5; v.velocity.z *= 0.5;
+export function createCarPhysics(g) {
+  const phys = {
+    step(v, inp, dt) {
+      if (v.wrecked) return;
+      const fwd = inp.forward ? 1 : 0;
+      const back = inp.back ? 1 : 0;
+      const hb = inp.handbrake ? 1 : 0;
+      const sr = Math.abs(v.speed) / v.top;
+      const steerMax = 0.52 - (0.52 - 0.06) * sr;
+      const steerTarget = (inp.left ? 1 : 0) - (inp.right ? 1 : 0);
+      v.steer += (steerTarget * steerMax - v.steer) * Math.min(1, dt * 8);
+      const yawMax = (2.3 - (2.3 - 0.9) * sr) * (hb ? 1.55 : 1);
+      const yaw = v.steer * yawMax * Math.min(1, Math.abs(v.speed) / 4 + 0.2) * Math.sign(v.speed || 1);
+      v.heading += yaw * dt;
+      let acc = 0;
+      if (fwd) acc += v.accel * (v.health < v.maxHealth / 2 ? 0.45 : 1);
+      if (back) acc -= v.accel * 0.6;
+      if (!fwd && !back) acc -= Math.sign(v.speed) * 4;
+      if (inp.brake) acc -= Math.sign(v.speed) * 26;
+      v.speed += acc * dt;
+      if (hb && Math.abs(v.speed) > 6) v.speed *= (1 - dt * 0.4);
+      v.speed = Math.max(-v.top * 0.6, Math.min(v.top, v.speed));
+      if (Math.abs(v.speed) < 0.15 && !fwd && !back) v.speed = 0;
+      const nx = v.pos.x + Math.sin(v.heading) * v.speed * dt;
+      const nz = v.pos.z + Math.cos(v.heading) * v.speed * dt;
+      const before = {x: v.pos.x, z: v.pos.z};
+      v.pos.x = nx; v.pos.z = nz;
+      const p = {x: v.pos.x, z: v.pos.z};
+      const hit = g.collision.resolveCircle(p, 1.6, 0);
+      v.pos.x = p.x; v.pos.z = p.z;
+      if (hit) {
+        const imp = Math.abs(v.speed);
+        if (imp > 4) phys.damage(v, imp * imp * 0.5);
+        v.speed *= 0.4;
+        if (g.effects) g.effects.sparks(v.pos.x, 1, v.pos.z, 6);
+      }
+      const gy = g.plan.groundHeight(v.pos.x, v.pos.z);
+      v.pos.y = gy;
+      v.mesh.position.copy(v.pos);
+      v.mesh.rotation.y = v.heading;
+      v.mesh.rotation.z = -v.steer * 0.12;
+      v.velocity.set(Math.sin(v.heading) * v.speed, 0, Math.cos(v.heading) * v.speed);
+      if (v.health < v.maxHealth * 0.45 && !v.burning && v.health > 0) { v.burning = true; v.burnT = 3.2; }
+      if (v.burning) {
+        v.burnT -= dt;
+        if (g.effects) g.effects.smoke(v.pos.x, 1.5, v.pos.z, dt);
+        if (v.burnT <= 0) phys.explode(v);
+      }
+      if (v.health <= 0 && !v.wrecked) phys.explode(v);
+    },
+    damage(v, amt) {
+      if (v.wrecked) return;
+      v.health -= amt;
+      if (v.health <= 0) { v.health = 0; phys.explode(v); }
+    },
+    explode(v) {
+      if (v.wrecked) return;
+      v.wrecked = true;
+      v.burning = false;
+      if (g.effects) g.effects.explosion(v.pos.x, 1.5, v.pos.z);
+      if (g.combat) g.combat.onExplosion(v.pos.x, v.pos.z, 9, 260);
+      if (g.audio) g.audio.boom(v.pos);
+      v.mesh.traverse((m) => { if (m.material && m.material.color) m.material = m.material.clone(); });
+      v.mesh.scale.y = 0.55;
     }
-  }
-  if (v.burnTimer > 0) {
-    v.burnTimer -= dt;
-    v.health = Math.max(0, v.health - 12 * dt);
-    if (v.health <= 0 && !v.wrecked) v.wrecked = true;
-  }
-  return v.speed;
-}
-export function collideVehicles(a, b) {
-  const dx = b.position.x - a.position.x;
-  const dz = b.position.z - a.position.z;
-  const d = Math.hypot(dx, dz);
-  const min = 3.4;
-  if (d >= min || d < 1e-4) return false;
-  const push = (min - d) / 2;
-  const nx = dx / d; const nz = dz / d;
-  a.position.x -= nx * push; a.position.z -= nz * push;
-  b.position.x += nx * push; b.position.z += nz * push;
-  const rel = Math.abs((a.velocity.x - b.velocity.x) * nx + (a.velocity.z - b.velocity.z) * nz);
-  if (rel > 3) {
-    a.condition = Math.max(0, a.condition - rel * 0.5);
-    b.condition = Math.max(0, b.condition - rel * 0.5);
-    a.velocity.x *= 0.7; a.velocity.z *= 0.7;
-    b.velocity.x *= 0.7; b.velocity.z *= 0.7;
-    return true;
-  }
-  return false;
+  };
+  g.carPhysics = phys;
+  return phys;
 }

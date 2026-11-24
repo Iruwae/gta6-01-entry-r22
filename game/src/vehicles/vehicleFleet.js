@@ -1,130 +1,130 @@
 import * as THREE from 'three';
-import { createVehicle, CAR_SPECS } from './carPhysics.js';
-const bodyMatCache = new Map();
-function bodyMat(color) {
-  if (!bodyMatCache.has(color)) {
-    bodyMatCache.set(color, new THREE.MeshStandardMaterial({ color, roughness: 0.35, metalness: 0.55 }));
+export const MAKES = {
+  sprint: {name: 'Sprint GT', top: 56, accel: 15, grip: 9.5, health: 1200, value: 4200, len: 4.4, color: 0xd02020},
+  interceptor: {name: 'SBPD Interceptor', top: 53, accel: 14, grip: 9.2, health: 1600, value: 0, len: 4.6, color: 0x1a2a3a, police: true},
+  brava: {name: 'Brava', top: 50, accel: 13, grip: 9, health: 1100, value: 3200, len: 4.3, color: 0x2080c0},
+  bulwark: {name: 'Bulwark', top: 44, accel: 10, grip: 8.5, health: 2400, value: 0, len: 5.4, color: 0x2a2a30, police: true},
+  cab: {name: 'Cab', top: 43, accel: 11, grip: 8.5, health: 1000, value: 1500, len: 4.4, color: 0xe0a020},
+  tide: {name: 'Tide', top: 42, accel: 11, grip: 8.8, health: 1000, value: 1800, len: 4.4, color: 0x40a080},
+  hauler: {name: 'Hauler', top: 40, accel: 8, grip: 7.5, health: 2200, value: 0, len: 6.5, color: 0x8a6a40},
+  fizz: {name: 'Fizz', top: 38, accel: 10, grip: 8.2, health: 800, value: 900, len: 3.6, color: 0xe0e040},
+  vanette: {name: 'Vanette', top: 36, accel: 9, grip: 7.8, health: 1400, value: 1200, len: 4.8, color: 0x808080},
+  rockhog: {name: 'Rockhog', top: 30, accel: 9, grip: 7, health: 1800, value: 2200, len: 5, color: 0x804020},
+  bus: {name: 'Bus', top: 27, accel: 5.5, grip: 6.5, health: 2800, value: 2000, len: 9, color: 0x40a0c0}
+};
+function buildCarMesh(g, kind, color) {
+  const m = MAKES[kind] || MAKES.tide;
+  const grp = new THREE.Group();
+  const bodyMat = new THREE.MeshStandardMaterial({color, roughness: 0.4, metalness: 0.4});
+  const glassMat = new THREE.MeshStandardMaterial({color: 0x18242e, roughness: 0.15, metalness: 0.6});
+  const darkMat = new THREE.MeshStandardMaterial({color: 0x181818, roughness: 0.9});
+  const L = m.len, W = kind === 'bus' ? 2.5 : 1.9;
+  const body = new THREE.Mesh(new THREE.BoxGeometry(W, 0.7, L), bodyMat);
+  body.position.y = 0.55;
+  body.castShadow = true;
+  grp.add(body);
+  const cabH = kind === 'bus' || kind === 'hauler' || kind === 'vanette' ? 0.9 : 0.55;
+  const cab = new THREE.Mesh(new THREE.BoxGeometry(W * 0.82, cabH, L * (kind === 'bus' ? 0.85 : 0.45)), glassMat);
+  cab.position.set(0, 1.05 + cabH / 2 - 0.2, kind === 'bus' ? 0 : -L * 0.08);
+  grp.add(cab);
+  const roof = new THREE.Mesh(new THREE.BoxGeometry(W * 0.86, 0.08, L * (kind === 'bus' ? 0.9 : 0.5)), bodyMat);
+  roof.position.set(0, 1.05 + cabH - 0.2, kind === 'bus' ? 0 : -L * 0.08);
+  grp.add(roof);
+  const wg = new THREE.CylinderGeometry(0.36, 0.36, 0.24, 10);
+  const wm = new THREE.MeshStandardMaterial({color: 0x111111, roughness: 0.9});
+  const hub = new THREE.MeshStandardMaterial({color: 0xc0c0c0, roughness: 0.3, metalness: 0.8});
+  for (const [wx, wz] of [[-W / 2, L * 0.32], [W / 2, L * 0.32], [-W / 2, -L * 0.32], [W / 2, -L * 0.32]]) {
+    const wh = new THREE.Mesh(wg, wm);
+    wh.rotation.z = Math.PI / 2;
+    wh.position.set(wx, 0.36, wz);
+    grp.add(wh);
+    const hb = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.26, 8), hub);
+    hb.rotation.z = Math.PI / 2;
+    hb.position.set(wx, 0.36, wz);
+    grp.add(hb);
   }
-  return bodyMatCache.get(color);
+  const hl = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.16, 0.06), new THREE.MeshBasicMaterial({color: 0xfff2c0}));
+  hl.position.set(-W / 2 + 0.3, 0.62, L / 2 + 0.01);
+  grp.add(hl);
+  const hl2 = hl.clone(); hl2.position.x = W / 2 - 0.3; grp.add(hl2);
+  const tl = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.14, 0.06), new THREE.MeshBasicMaterial({color: 0xff2020}));
+  tl.position.set(-W / 2 + 0.3, 0.62, -L / 2 - 0.01);
+  grp.add(tl);
+  const tl2 = tl.clone(); tl2.position.x = W / 2 - 0.3; grp.add(tl2);
+  const grille = new THREE.Mesh(new THREE.BoxGeometry(W * 0.6, 0.18, 0.05), darkMat);
+  grille.position.set(0, 0.5, L / 2 + 0.01);
+  grp.add(grille);
+  if (m.police) {
+    const bar = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.16, 0.4), darkMat);
+    bar.position.set(0, 1.45, -L * 0.08);
+    grp.add(bar);
+    const r = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.18, 0.42), new THREE.MeshBasicMaterial({color: 0xff2020}));
+    r.position.set(-0.28, 1.56, -L * 0.08);
+    grp.add(r);
+    const b = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.18, 0.42), new THREE.MeshBasicMaterial({color: 0x2040ff}));
+    b.position.set(0.28, 1.56, -L * 0.08);
+    grp.add(b);
+    grp.userData.lightBar = [r, b];
+  }
+  if (kind === 'cab') {
+    const sign = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.18, 0.3), new THREE.MeshBasicMaterial({color: 0xffe040}));
+    sign.position.set(0, 1.62, -L * 0.08);
+    grp.add(sign);
+  }
+  return grp;
 }
-const glassMat = new THREE.MeshStandardMaterial({ color: 0x33414f, roughness: 0.2, metalness: 0.6 });
-const wheelMat = new THREE.MeshStandardMaterial({ color: 0x14161c, roughness: 0.9 });
-const hubMat = new THREE.MeshStandardMaterial({ color: 0xb8bcc4, roughness: 0.3, metalness: 0.8 });
-const lightRed = new THREE.MeshBasicMaterial({ color: 0xff2a2a });
-const lightBlue = new THREE.MeshBasicMaterial({ color: 0x2a7aff });
-export function createVehicleMesh(v) {
-  const g = new THREE.Group();
-  const body = new THREE.Mesh(new THREE.BoxGeometry(2, 0.62, 4.4), bodyMat(v.color));
-  body.position.y = 0.62; body.castShadow = true;
-  g.add(body);
-  const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.55, 2.2), glassMat);
-  cabin.position.set(0, 1.15, -0.2); cabin.castShadow = true;
-  g.add(cabin);
-  const roof = new THREE.Mesh(new THREE.BoxGeometry(1.74, 0.09, 2.24), bodyMat(v.color));
-  roof.position.set(0, 1.46, -0.2); roof.castShadow = true;
-  g.add(roof);
-  const wheelGeo = new THREE.CylinderGeometry(0.36, 0.36, 0.3, 10);
-  const hubGeo = new THREE.CylinderGeometry(0.2, 0.2, 0.34, 8);
-  for (const [wx, wz] of [[-0.95, 1.45], [0.95, 1.45], [-0.95, -1.45], [0.95, -1.45]]) {
-    const w = new THREE.Mesh(wheelGeo, wheelMat);
-    w.rotation.z = Math.PI / 2;
-    w.position.set(wx, 0.36, wz);
-    g.add(w);
-    const hub = new THREE.Mesh(hubGeo, hubMat);
-    hub.rotation.z = Math.PI / 2;
-    hub.position.set(wx, 0.36, wz);
-    g.add(hub);
-  }
-  if (v.specKey === 'interceptor' || v.specKey === 'bulwark') {
-    const bar = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.16, 0.4), lightRed);
-    bar.position.set(-0.28, 1.5, -0.2);
-    g.add(bar);
-    const bar2 = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.16, 0.4), lightBlue);
-    bar2.position.set(0.28, 1.5, -0.2);
-    g.add(bar2);
-    g.userData.lightBar = [bar, bar2];
-    const stripe = new THREE.Mesh(new THREE.BoxGeometry(2.02, 0.2, 4.42), new THREE.MeshBasicMaterial({ color: 0x1a2a4a }));
-    stripe.position.y = 0.62;
-    g.add(stripe);
-  }
-  const hlMat = new THREE.MeshBasicMaterial({ color: 0xfff2c8 });
-  const tlMat = new THREE.MeshBasicMaterial({ color: 0xff2a2a });
-  const darkMat = new THREE.MeshStandardMaterial({ color: 0x11131a, roughness: 0.9 });
-  for (const sx of [-0.55, 0.55]) {
-    const hl = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.14, 0.1), hlMat);
-    hl.position.set(sx, 0.72, 2.22); g.add(hl);
-    const tl = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.12, 0.1), tlMat);
-    tl.position.set(sx, 0.72, -2.22); g.add(tl);
-  }
-  const grille = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.22, 0.06), darkMat);
-  grille.position.set(0, 0.55, 2.23); g.add(grille);
-  const rear = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.3, 0.06), darkMat);
-  rear.position.set(0, 0.55, -2.23); g.add(rear);
-  g.userData.vehicle = v;
-  return g;
-}
-export function createFleet(scene, plan, rng) {
-  const vehicles = [];
-  const meshes = new Map();
-  const specs = Object.keys(CAR_SPECS).filter((k) => !['interceptor', 'bulwark'].includes(k));
-  function spawn(specKey, x, z, heading = 0, missionKey = null) {
-    const v = createVehicle(specKey, x, z, heading);
-    v.missionKey = missionKey;
-    const mesh = createVehicleMesh(v);
-    mesh.position.set(x, plan.groundHeight(x, z), z);
-    mesh.rotation.y = heading;
-    scene.add(mesh);
-    vehicles.push(v);
-    meshes.set(v, mesh);
-    return v;
-  }
-  function remove(v) {
-    const m = meshes.get(v);
-    if (m) { scene.remove(m); meshes.delete(v); }
-    const i = vehicles.indexOf(v);
-    if (i >= 0) vehicles.splice(i, 1);
-  }
-  function parkRandom(n, avoid) {
-    for (let i = 0; i < n; i++) {
-      const j = rng.pick(plan.junctions.filter((jj) => !jj.island));
-      const to = plan.nextWander(j.id, j.id);
-      const pt = plan.pointAlongRoad(j.id, to, rng.range(15, 70));
-      if (!pt) continue;
-      if (avoid && Math.hypot(pt.x - avoid.x, pt.z - avoid.z) < 25) continue;
-      const v = spawn(rng.pick(specs), pt.x, pt.z, pt.heading);
-      v.parked = true;
-    }
-  }
-  function explode(v) {
-    v.burnTimer = 6;
-    v.health = Math.max(0, v.health - 40);
-    return v;
-  }
-  function sync(dt, time) {
-    for (const v of vehicles) {
-      const m = meshes.get(v);
-      if (!m) continue;
-      m.position.set(v.position.x, (v.y ?? 0) + 0.02, v.position.z);
-      m.rotation.y = v.heading;
-      if (m.userData.lightBar) {
-        const phase = Math.floor(time * 6) % 2 === 0;
-        m.userData.lightBar[0].material = phase ? lightRed : lightBlue;
-        m.userData.lightBar[1].material = phase ? lightBlue : lightRed;
+export function createFleet(g) {
+  const fleet = {
+    list: [],
+    spawn(kind, x, z, heading = 0, color) {
+      const m = MAKES[kind] || MAKES.tide;
+      const mesh = buildCarMesh(g, kind, color !== undefined ? color : m.color);
+      mesh.position.set(x, 0, z);
+      mesh.rotation.y = heading;
+      g.scene.add(mesh);
+      const v = {
+        kind, name: m.name, mesh, top: m.top, accel: m.accel, grip: m.grip,
+        health: m.health, maxHealth: m.health, value: m.value, len: m.len,
+        police: !!m.police, pos: mesh.position, heading, speed: 0, steer: 0,
+        velocity: new THREE.Vector3(), parked: true, burning: false, burnT: 0,
+        wrecked: false, driver: null, ai: null, color: color !== undefined ? color : m.color
+      };
+      fleet.list.push(v);
+      return v;
+    },
+    remove(v) {
+      const i = fleet.list.indexOf(v);
+      if (i >= 0) fleet.list.splice(i, 1);
+      g.scene.remove(v.mesh);
+    },
+    clear() {
+      for (const v of fleet.list.slice()) fleet.remove(v);
+    },
+    nearest(x, z, maxD, filter) {
+      let best = null, bd = maxD * maxD;
+      for (const v of fleet.list) {
+        if (filter && !filter(v)) continue;
+        const dx = v.pos.x - x, dz = v.pos.z - z, d = dx * dx + dz * dz;
+        if (d < bd) { bd = d; best = v; }
       }
-      if (v.burnTimer > 0) {
-        const s = 1 + Math.sin(time * 20) * 0.02;
-        m.scale.set(s, s, s);
+      return best;
+    },
+    update(dt, inp) {
+      for (const v of fleet.list) {
+        if (v.ai) { v.ai(v, dt); continue; }
+        if (v === g.player.vehicle) continue;
+        if (v.parked) continue;
+        g.carPhysics.step(v, {forward: false, back: false, left: false, right: false, brake: false, handbrake: false}, dt);
+      }
+      for (const v of fleet.list) {
+        if (v.police && v.mesh.userData.lightBar) {
+          const ph = Math.floor(g.time * 6) % 2;
+          v.mesh.userData.lightBar[0].material.color.setHex(ph ? 0xff2020 : 0x601010);
+          v.mesh.userData.lightBar[1].material.color.setHex(ph ? 0x101060 : 0x2040ff);
+        }
       }
     }
-  }
-  function nearestEnterable(x, z, maxD = 4) {
-    let best = null;
-    let bestD = maxD;
-    for (const v of vehicles) {
-      const d = Math.hypot(v.position.x - x, v.position.z - z);
-      if (d < bestD) { bestD = d; best = v; }
-    }
-    return best;
-  }
-  return { vehicles, meshes, spawn, remove, parkRandom, explode, sync, nearestEnterable };
+  };
+  g.fleet = fleet;
+  return fleet;
 }

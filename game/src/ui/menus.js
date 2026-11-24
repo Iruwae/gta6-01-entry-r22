@@ -1,126 +1,107 @@
-import { WEAPON_SLOTS } from '../combat/weapons.js';
-import { CAR_SPECS } from '../vehicles/carPhysics.js';
-import { MISSIONS } from '../missions/story.js';
-const fmt$ = (n) => '$' + Math.round(n).toLocaleString('en-US');
-export function createMenus(game) {
+import {WEAPONS} from '../combat/weapons.js';
+export function createMenus(g) {
   const $ = (id) => document.getElementById(id);
-  const show = (id, v) => { $(id).style.display = v; };
+  const el = {
+    title: $('title-screen'), pause: $('pause-screen'), respawn: $('respawn-screen'),
+    shop: $('shop-screen'), wheel: $('wheel'), hud: $('hud'),
+    tsNew: $('ts-new'), tsContinue: $('ts-continue'), slots: document.querySelectorAll('#ts-slots .slot'),
+    btnResume: $('btn-resume'), btnGarage: $('btn-garage'), btnSave: $('btn-save'), btnQuit: $('btn-quit'),
+    btnRespawn: $('btn-respawn'), respawnTitle: $('respawn-title'), respawnText: $('respawn-text'),
+    shopRows: $('shop-rows'), btnShopClose: $('btn-shop-close'),
+    pauseMoney: $('pause-money'), careerRows: $('career-rows'), standingRows: $('standing-rows')
+  };
+  const show = (e, on) => { if (e) e.classList.toggle('hidden', !on); };
   const menus = {
     showTitle() {
-      show('screen-title', 'flex'); show('screen-pause', 'none'); show('screen-shop', 'none'); show('hud', 'none');
+      show(el.title, true); show(el.pause, false); show(el.respawn, false); show(el.shop, false); show(el.hud, false);
       menus.refreshSlots();
     },
-    hideTitle() { show('screen-title', 'none'); show('hud', 'block'); },
-    showPause() { show('screen-pause', 'flex'); menus.fillStats(); },
-    hidePause() { show('screen-pause', 'none'); },
-    showShop() { show('screen-shop', 'flex'); menus.fillShop(); },
-    hideShop() { show('screen-shop', 'none'); },
-    refreshSlots() {
-      const list = $('save-slots');
-      if (!list) return;
-      const slots = game.save.list();
-      list.innerHTML = slots.map((s, i) => {
-        const label = s ? `SLOT ${i + 1} — ${s.money ? '$' + s.money : ''} · ${s.missionsDone ? s.missionsDone.length : 0} jobs` : `SLOT ${i + 1} — EMPTY`;
-        return `<button class="save-slot" data-slot="${i}">${label}</button>`;
-      }).join('');
-      list.querySelectorAll('.save-slot').forEach((b) => {
-        b.addEventListener('click', () => {
-          const i = Number(b.dataset.slot);
-          if (game.save.exists(i)) game.load(i);
-          else game.save.save(i);
-          menus.hideTitle();
-          game.startPlay();
-        });
-      });
+    hideTitle() {
+      show(el.title, false); show(el.hud, true);
+      if (g.ui) g.ui.queueDialogue(g.story.list[0].dialogue);
     },
-    fillStats() {
-      const p = game.player;
-      const moneyEl = $('pause-money');
-      if (moneyEl) moneyEl.textContent = fmt$(p.money);
+    showPause() {
+      show(el.pause, true);
+      const p = g.player;
+      el.pauseMoney.textContent = '$' + Math.floor(p.money).toLocaleString('en-US');
+      const st = p.stats;
       const rows = [
-        ['MONEY', fmt$(p.money)],
-        ['RESPECT', game.respect.rank().name + ' (' + game.respect.rp + ' RP)'],
-        ['JOBS DONE', game.save.data.missionsDone.length + ' / ' + MISSIONS.length],
-        ['WANTED', '★'.repeat(game.wanted.level) + '☆'.repeat(5 - game.wanted.level)],
-        ['CARS STOLEN', p.stats.carsStolen],
-        ['KILLS', p.stats.kills],
-        ['COPS EVADED', p.stats.copsEvaded],
-        ['EARNED', fmt$(p.stats.earned)],
-        ['SOL COINS', game.activities.coinsCollected + ' / 20'],
-        ['DISTRICT', game.plan.districtAt(p.position.x, p.position.z).name],
+        ['MONEY', '$' + Math.floor(p.money).toLocaleString('en-US')],
+        ['RANK', (g.respect ? g.respect.name() : 'NOBODY') + ' (' + (g.respect ? g.respect.rp : 0) + ' RP)'],
+        ['JOBS DONE', (g.story ? g.story.done : 0) + '/8'],
+        ['CARS STOLEN', st.carsStolen],
+        ['KILLS', st.kills],
+        ['EARNED', '$' + Math.floor(st.earned).toLocaleString('en-US')],
+        ['SOL COINS', (g.activities ? g.activities.coinsCollected : 0) + '/20'],
+        ['TIME', g.clock.timeStr()]
       ];
-      const el = $('stats-rows');
-      if (el) el.innerHTML = rows.map(([k, v]) => `<div class="stats-row"><span>${k}</span><span>${v}</span></div>`).join('');
-      const standings = $('stats-standing');
-      if (standings) {
-        standings.innerHTML = game.standing.bars().map((b) => {
-          const w = Math.round(((b.value + 100) / 200) * 100);
-          return `<div class="standing-row"><span>${b.name}</span><div class="standing-bar"><div style="width:${w}%"></div></div><span>${b.value}</span></div>`;
-        }).join('');
+      el.careerRows.innerHTML = rows.map(r => '<div class="crow"><span>' + r[0] + '</span><b>' + r[1] + '</b></div>').join('');
+      const districts = ['PALMERA STRAND', 'SUNDIAL SQUARE', 'VIDRIO HEIGHTS', 'OLD CANNERY', 'MARINA ROW', 'SALTFLATS PORT', 'SEAGLASS BEACH', 'CORAL KEYS'];
+      el.standingRows.innerHTML = districts.map(d => '<div class="crow"><span>' + d + '</span><div class="sbar"><div style="width:' + Math.min(100, (g.respect ? g.respect.rp : 0) / 50) + '%"></div></div><b>NEUTRAL</b></div>').join('');
+    },
+    hidePause() { show(el.pause, false); },
+    showRespawn(kind, fee) {
+      el.respawnTitle.textContent = kind;
+      el.respawnText.textContent = 'You lost $' + fee + ' in hospital bills / bail.';
+      show(el.respawn, true);
+    },
+    hideRespawn() { show(el.respawn, false); },
+    showShop() {
+      show(el.shop, true);
+      const rows = [];
+      for (const key of Object.keys(WEAPONS)) {
+        const w = WEAPONS[key];
+        if (w.price > 0) rows.push({label: w.name + ' — $' + w.price, buy: () => g.loadout.buy(key)});
+        if (w.refill > 0) rows.push({label: w.name + ' refill — $' + w.refill, buy: () => g.loadout.refill(key)});
+      }
+      rows.push({label: 'RESPRAY — $350', buy: () => g.activities.buyService('respray')});
+      rows.push({label: 'ARMOUR — $400', buy: () => g.activities.buyService('armour')});
+      el.shopRows.innerHTML = '';
+      for (const r of rows) {
+        const div = document.createElement('div');
+        div.className = 'srow';
+        const sp = document.createElement('span');
+        sp.textContent = r.label;
+        const b = document.createElement('button');
+        b.textContent = 'BUY';
+        b.addEventListener('click', () => { if (r.buy()) { if (g.hud) g.hud.notify('Bought ' + r.label); } });
+        div.appendChild(sp); div.appendChild(b);
+        el.shopRows.appendChild(div);
       }
     },
-    fillShop() {
-      const p = game.player;
-      const moneyEl = $('shop-money');
-      if (moneyEl) moneyEl.textContent = fmt$(p.money);
-      const weaponsEl = $('shop-weapons');
-      if (weaponsEl) {
-        weaponsEl.innerHTML = WEAPON_SLOTS.filter((w) => w.key !== 'fists').map((w) => {
-          const owned = game.loadout.ammo(w.key) > 0;
-          const btn = w.locked
-            ? '<span class="locked-tag">LOCKED — RANK FIXER</span>'
-            : owned
-              ? `<button data-buy-weapon="${w.key}">AMMO $${Math.round(w.price / 2)}</button>`
-              : `<button data-buy-weapon="${w.key}">BUY $${w.price}</button>`;
-          return `<div class="shop-row"><span>${w.name}</span><span>${game.loadout.ammo(w.key)} ammo</span>${btn}</div>`;
-        }).join('');
-      }
-      const carsEl = $('shop-cars');
-      if (carsEl) {
-        carsEl.innerHTML = Object.entries(CAR_SPECS).filter(([k]) => !['interceptor', 'bulwark', 'taxi', 'van'].includes(k)).map(([k, spec]) => {
-          const owned = game.save.data.carsOwned.includes(k);
-          const btn = owned
-            ? '<span class="owned-tag">OWNED</span>'
-            : `<button data-buy-car="${k}">BUY ${fmt$(spec.price)}</button>`;
-          return `<div class="shop-row"><span>${spec.name}</span><span>TOP ${Math.round(spec.top * 2.237)} mph</span>${btn}</div>`;
-        }).join('');
-      }
-      document.querySelectorAll('[data-buy-weapon]').forEach((b) => {
-        b.addEventListener('click', () => {
-          const w = WEAPON_SLOTS.find((x) => x.key === b.dataset.buyWeapon);
-          const owned = game.loadout.ammo(w.key) > 0;
-          const price = owned ? Math.round(w.price / 2) : w.price;
-          if (game.player.money < price) { game.ui.showToast('Not enough money'); return; }
-          game.player.money -= price;
-          game.loadout.give(w.key, w.ammo);
-          game.ui.showToast(`${w.name} ${owned ? 'ammo' : 'bought'} — $${price}`);
-          menus.fillShop();
-        });
-      });
-      document.querySelectorAll('[data-buy-car]').forEach((b) => {
-        b.addEventListener('click', () => {
-          const spec = CAR_SPECS[b.dataset.buyCar];
-          if (game.player.money < spec.price) { game.ui.showToast('Not enough money'); return; }
-          game.player.money -= spec.price;
-          game.save.data.carsOwned.push(b.dataset.buyCar);
-          const place = game.plan.placeById.get('garage');
-          const v = game.fleet.spawn(b.dataset.buyCar, place.x + 10, place.z + 8, 1.2);
-          v.parked = true;
-          game.ui.showToast(`${spec.name} parked at Lena’s Garage`);
-          menus.fillShop();
-        });
+    hideShop() { show(el.shop, false); },
+    showWheel() {
+      show(el.wheel, true);
+      el.wheel.innerHTML = '';
+      const keys = ['fists', 'pistol', 'smg', 'shotgun', 'rifle', 'rpg'];
+      keys.forEach((k, i) => {
+        const a = (i / keys.length) * Math.PI * 2 - Math.PI / 2;
+        const sp = document.createElement('div');
+        sp.className = 'wseg';
+        sp.textContent = WEAPONS[k].name;
+        sp.style.transform = 'translate(' + (Math.cos(a) * 140) + 'px,' + (Math.sin(a) * 140) + 'px) translate(-50%,-50%)';
+        el.wheel.appendChild(sp);
       });
     },
-    wire() {
-      const on = (id, fn) => { const b = $(id); if (b) b.addEventListener('click', fn); };
-      on('btn-start', () => { menus.hideTitle(); game.startPlay(); });
-      on('btn-continue', () => { menus.hideTitle(); game.startPlay(); });
-      on('btn-resume', () => { menus.hidePause(); game.resume(); });
-      on('btn-quit', () => { game.save.save(0); menus.hidePause(); menus.showTitle(); game.toTitle(); });
-      on('btn-shop', () => { menus.showShop(); });
-      on('btn-shop-close', () => { menus.hideShop(); });
-      on('btn-save', () => { game.save.save(0); game.ui.showToast('Saved to slot 1'); });
-    },
+    hideWheel() { show(el.wheel, false); },
+    refreshSlots() {
+      el.slots.forEach((s, i) => {
+        s.textContent = g.save ? g.save.summary(i) : 'SLOT ' + (i + 1) + ' — EMPTY';
+      });
+    }
   };
+  el.tsNew.addEventListener('click', () => { g.newGame(); });
+  el.tsContinue.addEventListener('click', () => { if (g.save && g.save.read(0)) { g.newGame(); g.save.load(0); } });
+  el.slots.forEach((s, i) => s.addEventListener('click', () => {
+    if (g.save && g.save.read(i)) { g.newGame(); g.save.load(i); }
+    else g.newGame();
+  }));
+  el.btnResume.addEventListener('click', () => { g.mode = 'play'; menus.hidePause(); });
+  el.btnGarage.addEventListener('click', () => { menus.showShop(); });
+  el.btnSave.addEventListener('click', () => { if (g.save) { g.save.write(0); if (g.hud) g.hud.notify('Saved'); } });
+  el.btnQuit.addEventListener('click', () => { g.mode = 'title'; menus.hidePause(); menus.showTitle(); });
+  el.btnRespawn.addEventListener('click', () => { menus.hideRespawn(); g.player.respawn(); });
+  el.btnShopClose.addEventListener('click', () => menus.hideShop());
+  g.menus = menus;
   return menus;
 }

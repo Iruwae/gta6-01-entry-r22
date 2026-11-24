@@ -1,55 +1,41 @@
-const KEY = 'solmar-bay-save';
-export function createSaveGame(game) {
-  function readAll() {
-    try {
-      return JSON.parse(localStorage.getItem(KEY) || '[]');
-    } catch {
-      return [];
+export function createSave(g) {
+  const KEY = 'solmar-bay-save-';
+  const s = {
+    slots: [null, null, null],
+    read(i) {
+      try { return JSON.parse(localStorage.getItem(KEY + i)); } catch (e) { return null; }
+    },
+    write(i) {
+      const data = {
+        money: g.player.money, rp: g.respect ? g.respect.rp : 0,
+        missions: g.story ? g.story.done : 0,
+        conches: g.activities ? g.activities.coinsCollected : 0,
+        stats: g.player.stats, time: g.clock.h,
+        x: g.player.pos.x, z: g.player.pos.z
+      };
+      try { localStorage.setItem(KEY + i, JSON.stringify(data)); } catch (e) {}
+      s.slots[i] = data;
+      return data;
+    },
+    load(i) {
+      const d = s.read(i);
+      if (!d) return false;
+      g.player.money = d.money;
+      if (g.respect) g.respect.set(d.rp);
+      if (g.story) g.story.done = d.missions;
+      if (g.activities) g.activities.coinsCollected = d.conches;
+      Object.assign(g.player.stats, d.stats || {});
+      g.player.placeAt(d.x, d.z, 0);
+      return true;
+    },
+    auto() { s.write(0); },
+    summary(i) {
+      const d = s.slots[i] || s.read(i);
+      if (!d) return 'SLOT ' + (i + 1) + ' — EMPTY';
+      return 'SLOT ' + (i + 1) + ' — $' + d.money + ' · ' + d.missions + '/8 jobs';
     }
-  }
-  function writeAll(slots) {
-    try { localStorage.setItem(KEY, JSON.stringify(slots)); } catch { /* storage full or blocked */ }
-  }
-  const save = {
-    data: {
-      money: 500,
-      rp: 0,
-      missionsDone: [],
-      carsOwned: ['comet'],
-      coinsCollected: 0,
-      position: { x: -400, z: 290 },
-      station: 0,
-    },
-    list() {
-      const all = readAll();
-      return [all[0] || null, all[1] || null, all[2] || null];
-    },
-    exists(i) { return !!readAll()[i]; },
-    save(i = 0) {
-      const all = readAll();
-      save.data.money = game.player.money;
-      save.data.rp = game.respect.rp;
-      save.data.coinsCollected = game.activities.coinsCollected;
-      save.data.position = { x: game.player.position.x, z: game.player.position.z };
-      save.data.station = game.radio.station;
-      all[i] = { ...save.data, savedAt: new Date().toISOString() };
-      writeAll(all);
-      return true;
-    },
-    load(i = 0) {
-      const slot = readAll()[i];
-      if (!slot) return false;
-      save.data = { ...save.data, ...slot };
-      game.player.money = save.data.money;
-      game.respect.rp = save.data.rp;
-      game.activities.coinsCollected = save.data.coinsCollected;
-      game.radio.station = save.data.station || 0;
-      game.player.placeAt(save.data.position.x, save.data.position.z);
-      return true;
-    },
-    reset() {
-      save.data = { money: 500, rp: 0, missionsDone: [], carsOwned: ['comet'], coinsCollected: 0, position: { x: -400, z: 290 }, station: 0 };
-    },
   };
-  return save;
+  for (let i = 0; i < 3; i++) s.slots[i] = s.read(i);
+  g.save = s;
+  return s;
 }

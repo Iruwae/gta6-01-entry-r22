@@ -1,188 +1,88 @@
-export function createCityPlan(rng) {
-  const COLS = 11;
-  const ROWS = 9;
-  const SPACING = 90;
-  const ROAD_W = 16;
-  const X0 = -450;
-  const Z0 = -360;
+export function createPlan(g) {
+  const P = 90, RW = 16, BS = 74;
+  const COLS = 8, ROWS = 7;
+  const X0 = -360, Z0 = -315;
+  const districts = [
+    {name: 'PALMERA STRAND', color: 0xf2c9a0, style: 'deco', stand: 58},
+    {name: 'SUNDIAL SQUARE', color: 0xd8cdb4, style: 'shop', stand: 50},
+    {name: 'VIDRIO HEIGHTS', color: 0x9fc4d8, style: 'glass', stand: 44},
+    {name: 'OLD CANNERY', color: 0xb8a888, style: 'brick', stand: 52},
+    {name: 'MARINA ROW', color: 0xc9b8a8, style: 'concrete', stand: 47},
+    {name: 'SALTFLATS PORT', color: 0xa8a898, style: 'warehouse', stand: 41},
+    {name: 'SEAGLASS BEACH', color: 0xe8d8a8, style: 'villa', stand: 60},
+    {name: 'CORAL KEYS', color: 0xd8e8d8, style: 'villa', stand: 55}
+  ];
   const junctions = [];
-  for (let r = 0; r < ROWS; r++) {
-    for (let c = 0; c < COLS; c++) {
-      junctions.push({ id: r * COLS + c, x: X0 + c * SPACING, z: Z0 + r * SPACING, island: false });
-    }
-  }
-  for (let r = 0; r < 3; r++) {
-    for (let c = 0; c < 3; c++) {
-      junctions.push({ id: 100 + r * 3 + c, x: 760 + c * 90, z: -180 + r * 90, island: true });
-    }
-  }
-  const byId = new Map(junctions.map((j) => [j.id, j]));
-  function neighbours(id) {
-    const j = byId.get(id);
-    const out = [];
-    if (!j) return out;
-    if (!j.island) {
-      const r = Math.floor(id / COLS);
-      const c = id % COLS;
-      if (c > 0) out.push(id - 1);
-      if (c < COLS - 1) out.push(id + 1);
-      if (r > 0) out.push(id - COLS);
-      if (r < ROWS - 1) out.push(id + COLS);
-      if (id === 3 * COLS + 10) out.push(101);
-    } else {
-      const r = Math.floor((id - 100) / 3);
-      const c = (id - 100) % 3;
-      if (c > 0) out.push(id - 1);
-      if (c < 2) out.push(id + 1);
-      if (r > 0) out.push(id - 3);
-      if (r < 2) out.push(id + 3);
-      if (id === 101) out.push(3 * COLS + 10);
-    }
-    return out;
-  }
-  const DISTRICTS = [
-    { name: 'PALMERA STRAND', lot: '#d9c48a', style: 'deco', palms: 1.0, lamps: 1.0 },
-    { name: 'SUNDIAL SQUARE', lot: '#b8b2a4', style: 'glass', palms: 0.5, lamps: 1.0 },
-    { name: 'VIDRIO HEIGHTS', lot: '#a8b8c8', style: 'glass', palms: 0.5, lamps: 1.0 },
-    { name: 'OLD CANNERY', lot: '#a89a7a', style: 'shop', palms: 0.5, lamps: 0.9 },
-    { name: 'MARINA ROW', lot: '#c8b89a', style: 'deco', palms: 0.9, lamps: 1.0 },
-    { name: 'SALTFLATS PORT', lot: '#8a8578', style: 'warehouse', palms: 0.15, lamps: 0.8 },
-    { name: 'SEAGLASS BEACH', lot: '#e0d0a0', style: 'villa', palms: 1.0, lamps: 0.9 },
-    { name: 'CORAL KEYS', lot: '#d8c8a8', style: 'villa', palms: 0.9, lamps: 0.9 },
-  ];
-  function districtOfBlock(bx, bz) {
-    if (bx >= 10) return 7;
-    if (bz >= 7) return 1;
-    if (bx >= 8 && bz <= 2) return 0;
-    if (bx >= 8) return 4;
-    if (bx <= 1 && bz >= 5) return 5;
-    if (bx >= 4 && bx <= 6 && bz >= 2 && bz <= 4) return 2;
-    if (bz <= 1) return 3;
-    if (bx <= 2 && bz >= 3) return 1;
-    if (bz >= 6) return 6;
-    return 2;
-  }
-  function districtAt(x, z) {
-    const bx = Math.floor((x - X0) / SPACING);
-    const bz = Math.floor((z - Z0) / SPACING);
-    if (x > 738) return DISTRICTS[7];
-    if (bx < 0 || bx > 9 || bz < 0 || bz > 7) return DISTRICTS[6];
-    return DISTRICTS[districtOfBlock(bx, bz)];
-  }
-  const PLACES = [
-    { id: 'garage', name: "Lena's Garage", x: -410, z: 300 },
-    { id: 'diner', name: 'La Rosa Diner', x: -320, z: 120 },
-    { id: 'chopshop', name: 'Chop Shop', x: -410, z: -300 },
-    { id: 'gunshop', name: 'Iron & Lead', x: 130, z: 210 },
-    { id: 'respray', name: 'Respray', x: 220, z: -240 },
-    { id: 'hospital', name: 'Bayside Clinic', x: 310, z: -330 },
-    { id: 'hq', name: 'SBPD HQ', x: 40, z: -330 },
-    { id: 'tower', name: 'Vane Tower', x: 130, z: -60 },
-    { id: 'club', name: 'Club Neon Tide', x: 400, z: 30 },
-    { id: 'piergate', name: 'Pier Gate', x: 470, z: 135 },
-    { id: 'pierend', name: 'Palmera Wheel', x: 630, z: 135 },
-    { id: 'docks', name: 'Saltflats Docks', x: -230, z: 400 },
-    { id: 'radio', name: 'Sunset Radio', x: -140, z: -150 },
-    { id: 'lighthouse', name: 'Keys Lighthouse', x: 940, z: -200 },
-    { id: 'marina', name: 'Marina Row', x: 430, z: 210 },
-    { id: 'villa', name: 'Vane Villa', x: 850, z: -40 },
-    { id: 'market', name: 'Night Market', x: -230, z: -60 },
-    { id: 'park', name: 'Flamingo Park', x: -50, z: 120 },
-  ];
-  const placeById = new Map(PLACES.map((p) => [p.id, p]));
-  function groundHeight(x, z) {
-    if (x >= 470 && x <= 750 && Math.abs(z + 90) < 8) {
-      const t = (x - 470) / 280;
-      return 0.15 + Math.sin(t * Math.PI) * 11;
-    }
-    if (x >= 458 && x <= 640 && Math.abs(z - 135) < 8) return 0.35;
-    if (x > 738) {
-      const d = Math.min(x - 738, 976 - x, z + 216, 36 - z);
-      if (d < 14) return -0.7 + ((d / 14) * 0.85);
-      return 0.15;
-    }
-    if (x >= 466 && x <= 540 && z > 300) {
-      const t = Math.min(1, (z - 300) / 60);
-      return 0.15 - t * 0.85;
-    }
-    if (z >= 368) return 0.15;
-    const bx = Math.floor((x - X0) / SPACING);
-    const bz = Math.floor((z - Z0) / SPACING);
-    const inBlockX = (x - X0) % SPACING;
-    const inBlockZ = (z - Z0) % SPACING;
-    if (bx >= 0 && bx < 10 && bz >= 0 && bz < 8 && inBlockX > ROAD_W / 2 && inBlockX < SPACING - ROAD_W / 2 && inBlockZ > ROAD_W / 2 && inBlockZ < SPACING - ROAD_W / 2) return 0.15;
-    return 0;
-  }
-  function nearestJunction(x, z) {
-    let best = junctions[0];
-    let bestD = Infinity;
-    for (const j of junctions) {
-      const d = (j.x - x) * (j.x - x) + (j.z - z) * (j.z - z);
-      if (d < bestD) { bestD = d; best = j; }
-    }
-    return best;
-  }
-  function pointAlongRoad(fromId, toId, along, lane = 2.7) {
-    const a = byId.get(fromId);
-    const b = byId.get(toId);
-    if (!a || !b) return null;
-    const dx = b.x - a.x;
-    const dz = b.z - a.z;
-    const len = Math.hypot(dx, dz) || 1;
-    const t = Math.max(0, Math.min(1, along / len));
-    const nx = -dz / len;
-    const nz = dx / len;
-    return { x: a.x + dx * t + nx * lane, z: a.z + dz * t + nz * lane, heading: Math.atan2(dx, dz) };
-  }
-  function nextWander(junctionId, fromId) {
-    const opts = neighbours(junctionId).filter((id) => id !== fromId);
-    if (!opts.length) return fromId;
-    const j = byId.get(junctionId);
-    const from = byId.get(fromId);
-    if (from && j) {
-      const dx = j.x - from.x;
-      const dz = j.z - from.z;
-      const straight = opts.find((id) => {
-        const n = byId.get(id);
-        return (n.x - j.x) * dx + (n.z - j.z) * dz > 0.5 * SPACING * SPACING * 0.5;
-      });
-      if (straight !== undefined && rng.chance(0.55)) return straight;
-    }
-    return rng.pick(opts);
-  }
-  function pursuitNext(junctionId, fromId, tx, tz) {
-    const opts = neighbours(junctionId);
-    let best = junctionId;
-    let bestD = Infinity;
-    for (const id of opts) {
-      const n = byId.get(id);
-      let d = Math.hypot(n.x - tx, n.z - tz);
-      if (id === fromId) d += 60;
-      if (d < bestD) { bestD = d; best = id; }
-    }
-    return best;
-  }
-  const LAND = [
-    { x1: -530, z1: -440, x2: 522, z2: 436 },
-    { x1: 738, z1: -216, x2: 976, z2: 36 },
-    { x1: 470, z1: -98, x2: 750, z2: -82 },
-    { x1: 458, z1: 127, x2: 640, z2: 143 },
-  ];
-  function landClamp(x, z) {
-    let best = null;
-    let bestD = Infinity;
-    for (const r of LAND) {
-      const cx = Math.max(r.x1, Math.min(r.x2, x));
-      const cz = Math.max(r.z1, Math.min(r.z2, z));
-      const d = (cx - x) * (cx - x) + (cz - z) * (cz - z);
-      if (d < bestD) { bestD = d; best = { x: cx, z: cz }; }
-    }
-    return best || { x, z };
-  }
-  return {
-    COLS, ROWS, SPACING, ROAD_W, X0, Z0,
-    junctions, byId, neighbours, DISTRICTS, districtOfBlock, districtAt,
-    PLACES, placeById, groundHeight, nearestJunction,
-    pointAlongRoad, nextWander, pursuitNext, landClamp,
+  for (let j = 0; j <= ROWS; j++) for (let i = 0; i <= COLS; i++) junctions.push({id: j * (COLS + 1) + i, i, j, x: X0 + i * P, z: Z0 + j * P});
+  const distAt = (c, r) => {
+    if (c >= 7) return r >= 5 ? 6 : 0;
+    if (r === 6) return c <= 1 ? 5 : 4;
+    if (c >= 3 && c <= 4 && r >= 2 && r <= 4) return 2;
+    if (c <= 1 && r <= 1) return 3;
+    if (c <= 1) return 5;
+    if (r >= 3 && r <= 4 && c >= 2 && c <= 3) return 1;
+    return 1;
   };
+  const blocks = [];
+  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+    const d = distAt(c, r);
+    blocks.push({c, r, cx: X0 + c * P + P / 2, cz: Z0 + r * P + P / 2, d, district: districts[d].name, style: districts[d].style, seed: (c * 7 + r * 13 + 5)});
+  }
+  const places = {
+    garage: {name: "Lena's Garage", x: -225, z: -45, kind: 'garage'},
+    safehouse: {name: 'Safehouse', x: -225, z: -45, kind: 'safehouse'},
+    diner: {name: 'Mango Diner', x: 45, z: 135, kind: 'diner'},
+    chopshop: {name: 'Chop Shop', x: -315, z: 225, kind: 'chopshop'},
+    gunshop: {name: 'Gun Shop', x: 135, z: -135, kind: 'gunshop'},
+    respray: {name: 'Respray', x: 225, z: 45, kind: 'respray'},
+    hospital: {name: 'Bayside Clinic', x: -135, z: -225, kind: 'hospital'},
+    policehq: {name: 'SBPD Precinct 4', x: 45, z: -225, kind: 'police'},
+    tower: {name: 'Solmar Tower', x: 45, z: -45, kind: 'tower'},
+    club: {name: 'Club Neon', x: 315, z: 45, kind: 'club'},
+    piergate: {name: 'Pier Gate', x: 405, z: 135, kind: 'pier'},
+    docks: {name: 'Docks', x: -315, z: 315, kind: 'docks'},
+    radio: {name: 'Sunset Studio', x: 135, z: 225, kind: 'radio'},
+    lighthouse: {name: 'Lighthouse', x: 640, z: -180, kind: 'lighthouse'},
+    marina: {name: 'Marina', x: 315, z: 225, kind: 'marina'},
+    villa: {name: 'Villa Coral', x: 585, z: -90, kind: 'villa'},
+    foodstand: {name: 'Food Stand', x: -45, z: 135, kind: 'food'},
+    market: {name: 'Night Market', x: -135, z: 45, kind: 'market'}
+  };
+  const plan = {
+    P, RW, BS, COLS, ROWS, X0, Z0, districts, junctions, blocks, places,
+    w: COLS * P, h: ROWS * P,
+    nearestJunction(x, z) {
+      let best = junctions[0], bd = 1e12;
+      for (const jn of junctions) { const dx = jn.x - x, dz = jn.z - z, d = dx * dx + dz * dz; if (d < bd) { bd = d; best = jn; } }
+      return best;
+    },
+    districtAt(x, z) {
+      const c = Math.max(0, Math.min(COLS - 1, Math.floor((x - X0) / P)));
+      const r = Math.max(0, Math.min(ROWS - 1, Math.floor((z - Z0) / P)));
+      if (x > 470) return districts[7];
+      return districts[distAt(c, r)];
+    },
+    streetName(x, z) {
+      const aves = ['Ridge Rd', 'Cannery Ave', 'Sundial Blvd', 'Lantern St', 'Hibiscus St', 'Old Mill St', 'Gull St', 'Coral St', 'Harbor St'];
+      const sts = ['Amber Ave', 'Breakwater Rd', 'Tidewater St', 'Seaglass Parade', 'Mango Ave', 'Tamarind St', 'Vidrio Blvd', 'Marlin St'];
+      const jn = plan.nearestJunction(x, z);
+      return Math.abs(jn.x - x) < Math.abs(jn.z - z) ? aves[jn.j % aves.length] : sts[jn.i % sts.length];
+    },
+    groundHeight(x, z) {
+      if (x >= 470 && x <= 750 && Math.abs(z + 90) < 8) { const t = (x - 470) / 280; return Math.sin(t * Math.PI) * 11; }
+      if (x >= 458 && x <= 640 && Math.abs(z - 135) < 8) return 0.35;
+      if (x > 450 && x < 540) return Math.max(-0.7, (450 - x) * 0.02);
+      if (x > 738) return 0.2;
+      return 0;
+    },
+    onRoad(x, z) {
+      const fx = ((x - X0) % P + P) % P, fz = ((z - Z0) % P + P) % P;
+      return fx < RW / 2 || fx > P - RW / 2 || fz < RW / 2 || fz > P - RW / 2;
+    },
+    clampLand(x, z) {
+      return {x: Math.max(-440, Math.min(760, x)), z: Math.max(-400, Math.min(360, z))};
+    }
+  };
+  g.plan = plan;
+  return plan;
 }

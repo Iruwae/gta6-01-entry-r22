@@ -1,156 +1,108 @@
-import { MISSIONS, DIALOGUE } from './story.js';
-export function createMissionRunner(game) {
-  const rn = {
-    active: null,
-    si: 0,
-    timer: 0,
-    marker: null,
-    guards: [],
-    rival: null,
-    missionList() {
-      return MISSIONS.map((m) => {
-        const done = game.save.data.missionsDone.includes(m.id);
-        return { id: m.id, title: m.title, giver: m.giver, reward: m.reward, done, available: !done && (!rn.active || rn.active.id === m.id) };
-      });
-    },
-    currentStage() {
-      if (!rn.active) return null;
-      return rn.active.stages[rn.si] || null;
-    },
-    nextStage() {
-      if (!rn.active) return null;
-      return rn.active.stages[rn.si + 1] || null;
-    },
+export function createMissionRunner(g) {
+  const rng = g.rng.fork('missions');
+  const mr = {
+    active: null, stepIdx: 0, stepState: null, timer: 0, kills: 0, collected: 0,
     start(id) {
-      const def = MISSIONS.find((m) => m.id === id);
-      if (!def || rn.active) return false;
-      rn.active = def;
-      rn.si = 0;
-      rn.timer = 0;
-      rn.guards = [];
-      rn.rival = null;
-      game.bus.emit('mission-start', { id });
-      game.ui.showDialogue(DIALOGUE[id === 'first-errand' ? 'intro' : id === 'gold-paint' ? 'goldPaint' : id === 'market-sweep' ? 'marketSweep' : 'bridgeRun']);
-      rn.setupStage();
+      const m = g.story.byId(id);
+      if (!m) return false;
+      mr.active = m;
+      mr.stepIdx = 0;
+      mr.kills = 0;
+      mr.collected = 0;
+      mr.setupStep();
+      if (g.hud) g.hud.missionCard(m);
+      if (g.ui) g.ui.queueDialogue(m.dialogue);
+      g.bus.emit('missionStart', m);
       return true;
     },
-    setupStage() {
-      const stage = rn.currentStage();
-      if (!stage) return;
-      if (stage.marker) {
-        const pl = game.plan.placeById.get(stage.marker);
-        if (pl) game.ui.setMarker(pl.x, pl.z, stage.text);
-      }
-      if (stage.vehicle) {
-        const pl = game.plan.placeById.get(stage.vehicle === 'phantom' ? 'docks' : 'garage');
-        const v = game.fleet.spawn(stage.vehicle, pl.x + 6, pl.z + 4, 1.2, stage.vehicle);
-        v.parked = true;
-        rn.missionVehicle = v;
-      }
-      if (stage.type === 'clear') {
-        const pl = game.plan.placeById.get(stage.area);
-        for (let i = 0; i < stage.count; i++) {
-          const g = game.pedestrians.spawn(pl.x + game.rng.range(-22, 22), pl.z + game.rng.range(-22, 22), 'guard');
-          g.state = 'walk';
-          rn.guards.push(g);
+    startNext() {
+      const idx = g.story.done;
+      if (idx >= g.story.list.length) return false;
+      return mr.start(g.story.list[idx].id);
+    },
+    curStep() {
+      return mr.active ? mr.active.steps[mr.stepIdx] : null;
+    },
+    setupStep() {
+      const s = mr.curStep();
+      if (!s) return;
+      mr.timer = s.timer || 0;
+      mr.stepState = {count: s.count || 0};
+      const place = g.plan.places[s.target];
+      if (place && (s.kind === 'kill' || s.kind === 'boss')) {
+        const n = s.kind === 'boss' ? 1 : (s.count || 4);
+        mr.stepState.guards = [];
+        for (let i = 0; i < n; i++) {
+          const gx = place.x + rng.float(-12, 12), gz = place.z + rng.float(-12, 12);
+          const gd = g.pedestrians.spawn(gx, gz, 'guard');
+          if (s.kind === 'boss') gd.health = 520;
+          mr.stepState.guards.push(gd);
         }
       }
-      if (stage.type === 'race') {
-        const pl = game.plan.placeById.get('docks');
-        const rival = game.fleet.spawn(stage.rival, pl.x - 6, pl.z, 1.2, 'rival');
-        rival.parked = false;
-        rn.rival = rival;
-        rn.raceFrom = { x: pl.x, y: pl.z };
-        rn.timer = 0;
-        game.ui.setMarker(game.plan.placeById.get(stage.marker).x, game.plan.placeById.get(stage.marker).z, stage.text);
+      if (place && s.kind === 'collect') {
+        for (let i = 0; i < (s.count || 3); i++) {
+          const jn = g.plan.junctions[rng.int(0, g.plan.junctions.length - 1)];
+          if (g.activities) g.activities.addPickup(jn.x, jn.z, 'package');
+        }
+      }
+      if (place && s.kind === 'steal') {
+        const v = g.fleet.spawn('sprint', place.x + 10, place.z + 6, 0, 0xd8b020);
+        v.parked = true;
+        mr.stepState.car = v;
       }
     },
-    completeStage() {
-      rn.si++;
-      const stage = rn.currentStage();
-      if (!stage) { rn.complete(); return; }
-      game.bus.emit('stage', { index: rn.si });
-      rn.setupStage();
+    advance() {
+      mr.stepIdx++;
+      if (mr.stepIdx >= mr.active.steps.length) mr.complete();
+      else mr.setupStep();
     },
     complete() {
-      const m = rn.active;
-      game.player.money += m.reward;
-      game.player.stats.earned += m.reward;
-      game.respect.add(m.rp);
-      game.save.data.missionsDone.push(m.id);
-      game.save.data.money = game.player.money;
-      game.ui.showToast(`JOB DONE — ${m.title} +$${m.reward}`);
-      game.ui.showDialogue(DIALOGUE.complete);
-      game.bus.emit('mission-complete', { id: m.id, reward: m.reward });
-      rn.active = null;
-      rn.si = 0;
-      game.ui.clearMarker();
+      const m = mr.active;
+      const reward = m.payout;
+      g.player.money += reward;
+      g.player.stats.earned += reward;
+      if (g.respect) g.respect.add(120 + Math.round(reward / 60));
+      g.story.done++;
+      if (g.hud) g.hud.missionPass(m, reward);
+      if (g.save) g.save.auto();
+      g.bus.emit('missionPass', m);
+      mr.active = null;
+      mr.stepIdx = 0;
     },
     fail(reason) {
-      game.ui.showToast(`JOB FAILED — ${reason}`);
-      game.ui.showDialogue(DIALOGUE.fail);
-      for (const g of rn.guards) game.pedestrians.remove(g);
-      if (rn.missionVehicle) game.fleet.remove(rn.missionVehicle);
-      if (rn.rival) game.fleet.remove(rn.rival);
-      rn.active = null;
-      rn.si = 0;
-      rn.guards = [];
-      game.ui.clearMarker();
-      game.bus.emit('mission-fail', { reason });
+      const m = mr.active;
+      if (g.hud) g.hud.missionFail(m, reason);
+      g.bus.emit('missionFail', m);
+      mr.active = null;
+      mr.stepIdx = 0;
     },
-    step(dt) {
-      if (!rn.active) return;
-      rn.timer += dt;
-      const stage = rn.currentStage();
-      if (!stage) return;
-      const p = game.player;
-      if (stage.type === 'enter') {
-        if (p.vehicle && p.vehicle.missionKey === stage.vehicle) {
-          if (stage.wanted) game.wanted.set(stage.wanted);
-          rn.completeStage();
-        }
-      } else if (stage.type === 'reach') {
-        const pl = game.plan.placeById.get(stage.marker);
-        const d = Math.hypot(p.position.x - pl.x, p.position.z - pl.z);
-        if (d < 12 && (!stage.needsWanted || game.wanted.level <= stage.needsWanted)) rn.completeStage();
-      } else if (stage.type === 'clear') {
-        const alive = rn.guards.filter((g) => !g.dead).length;
-        if (alive === 0) rn.completeStage();
-        for (const g of rn.guards) {
-          if (g.dead) continue;
-          const d = Math.hypot(g.position.x - p.position.x, g.position.z - p.position.z);
-          if (d < 26 && game.rng.chance(dt * 0.4)) {
-            game.combat.npcShoot(g.position, p.position, 8);
-          }
-          if (d < 40) {
-            g.state = 'walk';
-            g.target = { x: p.position.x, z: p.position.z };
-          }
-        }
-      } else if (stage.type === 'race') {
-        const pl = game.plan.placeById.get(stage.marker);
-        const d = Math.hypot(p.position.x - pl.x, p.position.z - pl.z);
-        if (d < 14) {
-          const rivalD = rn.rival ? Math.hypot(rn.rival.position.x - pl.x, rn.rival.position.z - pl.z) : 999;
-          if (rivalD > 14) rn.complete();
-          else rn.fail('The Phantom beat you to the pier.');
-          return;
-        }
-        if (rn.timer > 240) { rn.fail('Out of time on the bridge.'); return; }
-        if (rn.rival && !rn.rival.wrecked) {
-          const r = rn.rival;
-          const dx = pl.x - r.position.x;
-          const dz = pl.z - r.position.z;
-          const want = Math.atan2(dx, dz);
-          let dh = want - r.heading;
-          while (dh > Math.PI) dh -= Math.PI * 2;
-          while (dh < -Math.PI) dh += Math.PI * 2;
-          game.driveVehicle(r, { forward: 1, steer: Math.max(-1, Math.min(1, dh * 2)), handbrake: false }, dt);
-        }
+    update(dt) {
+      if (!mr.active) return;
+      const s = mr.curStep();
+      if (!s) return;
+      if (mr.timer > 0) {
+        mr.timer -= dt;
+        if (mr.timer <= 0) { mr.fail('Out of time'); return; }
       }
-      if (rn.missionVehicle && rn.missionVehicle.wrecked) rn.fail('The car was destroyed.');
-      if (p.health <= 0) rn.fail('You were taken down.');
-    },
+      const p = g.player.pos;
+      const place = g.plan.places[s.target];
+      if (!place) return;
+      const d = Math.hypot(p.x - place.x, p.z - place.z);
+      if (s.kind === 'drive' || s.kind === 'deliver') {
+        if (d < 12) mr.advance();
+      } else if (s.kind === 'steal') {
+        if (g.player.vehicle === mr.stepState.car) mr.advance();
+      } else if (s.kind === 'escape') {
+        if (g.wanted && g.wanted.stars === 0) mr.advance();
+      } else if (s.kind === 'kill' || s.kind === 'boss') {
+        const gs = mr.stepState.guards || [];
+        if (gs.length > 0 && gs.every(n => n.dead)) mr.advance();
+      } else if (s.kind === 'collect') {
+        if (mr.collected >= (s.count || 3)) mr.advance();
+      }
+      if (g.player.dead) mr.fail('Wasted');
+    }
   };
-  return rn;
+  g.missions = mr;
+  return mr;
 }

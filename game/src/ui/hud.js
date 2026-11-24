@@ -1,107 +1,120 @@
-export function createHud(game) {
+import {WEAPONS, SLOT_ORDER} from '../combat/weapons.js';
+export function createHud(g) {
   const $ = (id) => document.getElementById(id);
-  const els = {};
-  for (const id of ['money', 'wanted', 'stars', 'health', 'armor', 'health-bar', 'armor-bar', 'speed', 'car', 'condition', 'weapons', 'respect', 'respect-bar', 'dispatch', 'dispatch-rows', 'objective', 'objective-text', 'objective-next', 'timer', 'radio', 'district', 'standing', 'toast', 'dialogue', 'dialogue-name', 'dialogue-role', 'dialogue-lines', 'dialogue-portrait', 'prompt', 'marker', 'crosshair', 'speed-wrap', 'vehicle']) {
-    els[id.replace(/-([a-z])/g, (_, c) => c.toUpperCase())] = $('hud-' + id);
-  }
-  els.carName = els.car;
-  els.vehicleWrap = els.vehicle;
-  let toastTimer = 0;
-  let dialogueTimer = 0;
-  let lastMoney = null;
-  function fmtMoney(n) {
-    return '$' + Math.round(n).toLocaleString('en-US');
-  }
-  function setText(el, v) { if (el) el.textContent = v; }
-  function setShown(el, on) { if (el) el.style.display = on ? 'block' : 'none'; }
-  function setWidth(el, v) { if (el) el.style.width = v; }
-  const hud = {
-    update(dt) {
-      const p = game.player;
-      if (els.money && p.money !== lastMoney) { els.money.textContent = fmtMoney(p.money); lastMoney = p.money; }
-      if (els.stars) { els.stars.textContent = '★'.repeat(game.wanted.level) + '☆'.repeat(5 - game.wanted.level); els.stars.className = 'wanted-stars' + (game.wanted.level >= 3 ? ' hot' : ''); }
-      setText(els.wanted, game.wanted.label());
-      setText(els.health, Math.round(p.health));
-      setText(els.armor, Math.round(p.armor));
-      setWidth(els.healthBar, Math.max(0, p.health) + '%');
-      setWidth(els.armorBar, Math.max(0, p.armor) + '%');
-      const v = p.vehicle;
-      setShown(els.speedWrap, !!v);
-      setShown(els.vehicleWrap, !!v);
-      if (v) {
-        setText(els.speed, String(Math.round(v.speed * 2.237)));
-        setText(els.carName, v.spec.name);
-        setText(els.condition, Math.round(v.condition) + '%');
-      }
-      if (els.weapons) {
-        els.weapons.innerHTML = game.loadout.bar().map((w) => `<div class="weapon-slot${w.selected ? ' selected' : ''}${!w.owned || w.locked ? ' locked' : ''}"><span class="weapon-name">${w.name}</span><span class="weapon-ammo">${w.locked ? 'LOCKED' : w.ammo}</span></div>`).join('');
-      }
-      setText(els.respect, 'RANK · ' + game.respect.rank().name);
-      setWidth(els.respectBar, Math.round(game.respect.progress() * 100) + '%');
-      const rows = game.dispatch.rowsForHud();
-      setShown(els.dispatch, rows.length > 0);
-      if (els.dispatchRows) {
-        els.dispatchRows.innerHTML = rows.map((r) => `<div class="dispatch-row"><span class="dispatch-unit">${r.name}</span><span class="dispatch-dist">${r.dist}m</span><span class="${r.tactic === 'RAMMING' || r.tactic === 'FIRING' ? 'chip hot' : 'chip'}">${r.tactic}</span></div>`).join('');
-      }
-      const stage = game.missions.currentStage();
-      const next = game.missions.nextStage();
-      setShown(els.objective, !!stage);
-      if (stage) setText(els.objectiveText, stage.text);
-      setText(els.objectiveNext, next ? 'NEXT: ' + next.text : '');
-      if (els.timer) {
-        const t = game.missions.active && game.missions.active.id === 'bridge-run' ? game.missions.timer : (game.activities.fare ? game.activities.fare.timer : 0);
-        els.timer.textContent = t > 0 ? fmtTime(t) : '';
-      }
-      setText(els.radio, game.radio.line());
-      const d = game.plan.districtAt(p.position.x, p.position.z);
-      if (els.district && d) els.district.textContent = d.name.toUpperCase();
-      if (els.standing) {
-        const val = game.standing.value(d ? d.id : 'harbor');
-        els.standing.textContent = val > 20 ? 'RESPECTED' : val < -20 ? 'HOSTILE' : 'NEUTRAL';
-      }
-      setShown(els.crosshair, !v && game.loadout.selected !== 'fists');
-      if (toastTimer > 0) { toastTimer -= dt; if (toastTimer <= 0 && els.toast) els.toast.textContent = ''; }
-      if (dialogueTimer > 0) {
-        dialogueTimer -= dt;
-        if (dialogueTimer <= 0) hud.hideDialogue();
-      }
-    },
-    showToast(text, seconds = 4) {
-      if (els.toast) els.toast.textContent = text;
-      toastTimer = seconds;
-    },
-    showDialogue(d, seconds = 8) {
-      if (!els.dialogue) return;
-      els.dialogue.style.display = 'block';
-      setText(els.dialogueName, d.name);
-      setText(els.dialogueRole, d.role || '');
-      if (els.dialogueLines) els.dialogueLines.innerHTML = d.lines.map((l) => `<p>${l}</p>`).join('');
-      setText(els.dialoguePortrait, d.name.split(' ').map((w) => w[0]).join(''));
-      dialogueTimer = seconds;
-    },
-    hideDialogue() {
-      if (els.dialogue) els.dialogue.style.display = 'none';
-    },
-    setMarker(x, z, text) {
-      if (els.marker) {
-        els.marker.style.display = 'block';
-        els.marker.textContent = '◆ ' + text;
-      }
-    },
-    clearMarker() {
-      if (els.marker) els.marker.style.display = 'none';
-    },
-    showPrompt(text) {
-      if (els.prompt) { els.prompt.style.display = 'block'; els.prompt.textContent = text; }
-    },
-    hidePrompt() {
-      if (els.prompt) els.prompt.style.display = 'none';
-    },
+  const els = {
+    job: $('hud-job'), jobTitle: $('job-title'), jobStep: $('job-step'),
+    dispatch: $('hud-dispatch'), rows: $('dispatch-rows'),
+    radio: $('hud-radio'), money: $('money'), stars: $('stars'),
+    wantedPill: $('wanted-pill'), rankPanel: $('rank-panel'), rpFill: $('rp-fill'),
+    weapons: $('hud-weapons'), district: $('district-name'), stand: $('district-stand'),
+    hpFill: $('hp-fill'), hpNum: $('hp-num'), arFill: $('ar-fill'), arNum: $('ar-num'),
+    carName: $('car-name'), speed: $('speed'), cond: $('cond'),
+    hint: $('hud-hint'), dlg: $('hud-dialogue'), dlgName: $('dlg-name'),
+    dlgRole: $('dlg-role'), dlgText: $('dlg-text'), portrait: $('portrait'),
+    notify: $('hud-notify'), banner: $('hud-banner')
   };
+  let dispT = 0, uiT = 0;
+  const hud = {
+    notify(msg) {
+      const n = document.createElement('div');
+      n.className = 'note';
+      n.textContent = msg;
+      els.notify.appendChild(n);
+      while (els.notify.children.length > 4) els.notify.removeChild(els.notify.firstChild);
+      setTimeout(() => { if (n.parentNode) n.parentNode.removeChild(n); }, 4500);
+    },
+    wantedBanner(s) {
+      if (s > 0) hud.flashBanner('★'.repeat(s) + ' WANTED', 2000);
+    },
+    flashBanner(text, ms = 2500) {
+      els.banner.textContent = text;
+      els.banner.classList.remove('hidden');
+      setTimeout(() => els.banner.classList.add('hidden'), ms);
+    },
+    missionCard(m) {
+      hud.flashBanner('JOB ' + (g.story.done + 1) + '/8 · ' + m.title.toUpperCase(), 3000);
+      hud.job(m);
+    },
+    missionPass(m, reward) {
+      hud.flashBanner('JOB PASSED · +$' + reward, 3000);
+      hud.notify('Job passed: ' + m.title + ' +$' + reward);
+      hud.job(null);
+    },
+    missionFail(m, reason) {
+      hud.flashBanner('JOB FAILED · ' + reason, 3000);
+      hud.job(null);
+    },
+    job(m) {
+      if (!m) {
+        const cur = g.missions ? g.missions.active : null;
+        if (!cur) { els.jobTitle.textContent = 'No active job — press M'; els.jobStep.textContent = 'NEXT: Visit Lena at the garage'; return; }
+        m = cur;
+      }
+      const s = g.missions.curStep();
+      els.jobTitle.textContent = m.title + ' — ' + (s ? s.text : '');
+      els.jobStep.textContent = 'NEXT: ' + (s ? s.next : 'Job done');
+    },
+    radioLine() {
+      const st = g.radio.station();
+      els.radio.textContent = st.name + ' — ' + st.song;
+    },
+    buildWeapons() {
+      els.weapons.innerHTML = '';
+      for (const key of SLOT_ORDER) {
+        const w = WEAPONS[key];
+        const div = document.createElement('div');
+        div.className = 'wslot' + (g.loadout.current === key ? ' sel' : '') + (!g.loadout.owned[key] ? ' locked' : '');
+        div.id = 'ws-' + key;
+        div.innerHTML = '<div class="wn">' + w.name + '</div><div class="wa">' + (g.loadout.owned[key] ? ((w.inf || g.loadout.ammo[key] === Infinity) ? '∞' : g.loadout.ammo[key]) : 'LOCKED') + '</div>';
+        els.weapons.appendChild(div);
+      }
+    },
+    update(dt) {
+      const p = g.player;
+      els.money.textContent = '$' + Math.floor(p.money).toLocaleString('en-US');
+      const stars = g.wanted ? g.wanted.stars : 0;
+      els.stars.textContent = '★'.repeat(stars) + '☆'.repeat(5 - stars);
+      const rp = g.respect ? g.respect : null;
+      els.rankPanel.childNodes[0].textContent = 'RANK · ' + (rp ? rp.name() : 'NOBODY');
+      if (rp) els.rpFill.style.width = Math.round(rp.progress() * 100) + '%';
+      const inCar = !!p.vehicle;
+      els.carName.textContent = inCar ? p.vehicle.name.toUpperCase() : 'ON FOOT';
+      const mph = inCar ? Math.round(Math.abs(p.vehicle.speed) * 2.237) : 0;
+      els.speed.innerHTML = mph + '<span>MPH</span>';
+      els.cond.textContent = inCar ? Math.round(p.vehicle.health / p.vehicle.maxHealth * 100) + '%' : '';
+      els.hpFill.style.width = Math.round(p.health / p.maxHealth() * 100) + '%';
+      els.hpNum.textContent = Math.round(p.health);
+      els.arFill.style.width = Math.round(p.armour) + '%';
+      els.arNum.textContent = Math.round(p.armour);
+      const d = g.plan.districtAt(p.pos.x, p.pos.z);
+      els.district.textContent = d.name;
+      els.stand.textContent = 'NEUTRAL';
+      dispT += dt;
+      if (dispT > 0.25) {
+        dispT = 0;
+        const units = g.dispatch ? g.dispatch.units : [];
+        els.dispatch.style.display = units.length || (g.dispatch && g.dispatch.roadblock) ? 'block' : 'none';
+        els.rows.innerHTML = '';
+        for (const u of units.slice(0, 5)) {
+          const row = document.createElement('div');
+          row.className = 'urow';
+          row.innerHTML = '<span class="uname">' + u.name + '</span><span class="udist">' + u.dist() + 'm</span><span class="tactic ' + u.tactic.split(' ')[0] + '">' + u.tactic + '</span>';
+          els.rows.appendChild(row);
+        }
+        const wp = els.wantedPill;
+        if (g.dispatch && g.dispatch.roadblock) { wp.textContent = 'ROADBLOCKS UP'; wp.classList.remove('hidden'); }
+        else if (stars > 0) { wp.textContent = 'UNITS RESPONDING'; wp.classList.remove('hidden'); }
+        else wp.classList.add('hidden');
+        hud.buildWeapons();
+        hud.job();
+      }
+      uiT += dt;
+      if (uiT > 0.25) {
+        uiT = 0;
+        if (g.minimap) g.minimap.draw();
+      }
+    }
+  };
+  g.hud = hud;
   return hud;
-}
-function fmtTime(t) {
-  const m = Math.floor(t / 60);
-  const s = Math.floor(t % 60);
-  return `${m}:${String(s).padStart(2, '0')}`;
 }

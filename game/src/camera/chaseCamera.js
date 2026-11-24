@@ -1,60 +1,78 @@
 import * as THREE from 'three';
-export function createChaseCamera(camera) {
-  const cam = {
-    distance: 11,
-    height: 4.2,
-    position: new THREE.Vector3(0, 10, -20),
-    lookAt: new THREE.Vector3(0, 1, 0),
-    shakeOffset: new THREE.Vector3(),
-    orbitYaw: 0,
-    orbitPitch: 0,
-    orbitTimer: 0,
-    update(dt, tg, heading, speed, shake) {
-      cam.orbitTimer -= dt;
-      if (cam.orbitTimer <= 0) {
-        cam.orbitYaw += (0 - cam.orbitYaw) * Math.min(1, dt * 1.5);
-        cam.orbitPitch += (0 - cam.orbitPitch) * Math.min(1, dt * 1.5);
+export function createCamera(g) {
+  const cam = g.camera;
+  const c = {
+    yaw: 0, pitch: 0.32, dist: 6.2, shake: 0, shakeT: 0, idleT: 0, lookBack: false,
+    snap(pos, heading) {
+      c.yaw = heading;
+      c.pitch = 0.32;
+      c.idleT = 0;
+      const tgt = pos.clone ? pos.clone() : new THREE.Vector3(pos.x, pos.y || 1.5, pos.z);
+      c.update(0, tgt, heading);
+    },
+    snapBehind() {
+      const p = g.player;
+      const hd = p.vehicle ? p.vehicle.heading : p.heading;
+      c.yaw = hd;
+      c.pitch = 0.32;
+      c.shake = 0;
+    },
+    update(dt, targetPos, targetHeading) {
+      const p = g.player;
+      const inCar = !!p.vehicle;
+      const sp = inCar ? Math.abs(p.vehicle.speed) : 0;
+      const maxFov = inCar ? 78 : 62;
+      const fovT = p.aiming ? 54 : (inCar ? 62 + Math.min(16, sp * 0.4) : 62);
+      if (Math.abs(cam.fov - fovT) > 0.1) { cam.fov += (fovT - cam.fov) * Math.min(1, dt * 5); cam.updateProjectionMatrix(); }
+      const baseDist = inCar ? 6.2 + 0.75 * (p.vehicle.len || 4.4) : p.aiming ? 3.7 : 5.2;
+      const baseH = inCar ? 1.25 + 0.35 * 1.4 : p.aiming ? 1.78 : 1.66;
+      c.idleT += dt;
+      const moving = inCar ? sp > 1 : (p.vel.x !== 0 || p.vel.z !== 0);
+      if (moving) c.idleT = 0;
+      const wantYaw = targetHeading !== undefined ? targetHeading : (inCar ? p.vehicle.heading : p.yaw);
+      if (c.idleT > 0.9 && inCar) {
+        let dy = wantYaw - c.yaw;
+        while (dy > Math.PI) dy -= Math.PI * 2;
+        while (dy < -Math.PI) dy += Math.PI * 2;
+        const rate = 2.2 + 3.5 * Math.min(1, sp / 30);
+        c.yaw += dy * Math.min(1, dt * rate);
+      } else if (!inCar) {
+        c.yaw = p.yaw;
+        c.pitch = p.pitch;
       }
-      const lookDist = 6 + Math.min(10, speed * 0.35);
-      const lookX = tg.x + Math.sin(heading) * lookDist;
-      const lookZ = tg.z + Math.cos(heading) * lookDist;
-      const yaw = heading + Math.PI + cam.orbitYaw;
-      const dist = cam.distance + cam.orbitPitch * 0.4;
-      const wantX = tg.x + Math.sin(yaw) * dist;
-      const wantZ = tg.z + Math.cos(yaw) * dist;
-      const wantY = (tg.y ?? 0) + cam.height + cam.orbitPitch;
-      const k = 1 - Math.exp(-dt * 5);
-      cam.position.x += (wantX - cam.position.x) * k;
-      cam.position.y += (wantY - cam.position.y) * k;
-      cam.position.z += (wantZ - cam.position.z) * k;
-      cam.lookAt.x += (lookX - cam.lookAt.x) * (1 - Math.exp(-dt * 7));
-      cam.lookAt.y += ((tg.y ?? 0) + 1.4 - cam.lookAt.y) * (1 - Math.exp(-dt * 7));
-      cam.lookAt.z += (lookZ - cam.lookAt.z) * (1 - Math.exp(-dt * 7));
-      if (shake > 0.001) {
-        cam.shakeOffset.set(
-          (Math.random() - 0.5) * shake * 0.6,
-          (Math.random() - 0.5) * shake * 0.4,
-          (Math.random() - 0.5) * shake * 0.6,
-        );
-      } else {
-        cam.shakeOffset.set(0, 0, 0);
+      if (c.lookBack) c.yaw = wantYaw + Math.PI;
+      const dist = baseDist;
+      const cx = targetPos.x - Math.sin(c.yaw) * Math.cos(c.pitch) * dist;
+      const cz = targetPos.z - Math.cos(c.yaw) * Math.cos(c.pitch) * dist;
+      const cy = targetPos.y + baseH + Math.sin(c.pitch) * dist;
+      let fx = cx, fz = cz, fy = cy;
+      const dx = cx - targetPos.x, dz = cz - targetPos.z;
+      const dd = Math.hypot(dx, dz);
+      if (dd > 0.9) {
+        const steps = Math.floor(dd / 2);
+        for (let i = 1; i <= steps; i++) {
+          const t = i / steps;
+          const b = g.collision.solidAt(targetPos.x + dx * t, targetPos.z + dz * t, 0);
+          if (b && b.h > targetPos.y + 1) {
+            const tt = Math.max(0.15, t - 0.4 / dd);
+            fx = targetPos.x + dx * tt; fz = targetPos.z + dz * tt;
+            break;
+          }
+        }
       }
-      camera.position.copy(cam.position).add(cam.shakeOffset);
-      camera.lookAt(cam.lookAt.x + cam.shakeOffset.x, cam.lookAt.y + cam.shakeOffset.y, cam.lookAt.z + cam.shakeOffset.z);
+      fy = Math.max(fy, g.plan.groundHeight(fx, fz) + 0.35);
+      if (c.shake > 0) {
+        c.shakeT += dt;
+        const s = c.shake * Math.exp(-5 * c.shakeT);
+        fx += Math.sin(c.shakeT * 47) * s * 0.3;
+        fy += Math.sin(c.shakeT * 39) * s * 0.3;
+        if (s < 0.01) c.shake = 0;
+      }
+      cam.position.set(fx, fy, fz);
+      cam.lookAt(targetPos.x, targetPos.y + 1.2, targetPos.z);
     },
-    snap(tg, heading) {
-      const yaw = heading + Math.PI;
-      cam.position.set(tg.x + Math.sin(yaw) * cam.distance, (tg.y ?? 0) + cam.height, tg.z + Math.cos(yaw) * cam.distance);
-      cam.lookAt.set(tg.x + Math.sin(heading) * 8, (tg.y ?? 0) + 1.4, tg.z + Math.cos(heading) * 8);
-    },
-    orbit(dx, dy) {
-      cam.orbitYaw -= dx * 0.004;
-      cam.orbitPitch = Math.max(-6, Math.min(6, cam.orbitPitch + dy * 0.05));
-      cam.orbitTimer = 3;
-    },
-    zoom(delta) {
-      cam.distance = Math.max(6, Math.min(20, cam.distance + delta * 0.01));
-    },
+    addShake(a) { c.shake = Math.min(1.2, c.shake + a); c.shakeT = 0; }
   };
-  return cam;
+  g.chaseCamera = c;
+  return c;
 }
