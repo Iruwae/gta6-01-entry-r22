@@ -1,19 +1,11 @@
 export function createBus() {
-  const listeners = new Map();
+  const m = new Map();
   return {
-    on(event, fn) {
-      if (!listeners.has(event)) listeners.set(event, []);
-      listeners.get(event).push(fn);
-      return () => {
-        const list = listeners.get(event) || [];
-        const at = list.indexOf(fn);
-        if (at >= 0) list.splice(at, 1);
-      };
+    on(e, f) {
+      if (!m.has(e)) m.set(e, []);
+      m.get(e).push(f);
+      return () => { const l = m.get(e) || [], i = l.indexOf(f); if (i >= 0) l.splice(i, 1); };
     },
-    emit(event, data) {
-      const list = listeners.get(event);
-      if (!list) return;
-      for (const fn of [...list]) fn(data);
-    },
+    emit(e, d) { const l = m.get(e); if (l) for (const f of [...l]) f(d); },
   };
 }

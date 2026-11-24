@@ -4,32 +4,17 @@ import { MISSIONS } from '../missions/story.js';
 const fmt$ = (n) => '$' + Math.round(n).toLocaleString('en-US');
 export function createMenus(game) {
   const $ = (id) => document.getElementById(id);
+  const show = (id, v) => { $(id).style.display = v; };
   const menus = {
     showTitle() {
-      $('screen-title').style.display = 'flex';
-      $('screen-pause').style.display = 'none';
-      $('screen-shop').style.display = 'none';
-      $('hud').style.display = 'none';
+      show('screen-title', 'flex'); show('screen-pause', 'none'); show('screen-shop', 'none'); show('hud', 'none');
       menus.refreshSlots();
     },
-    hideTitle() {
-      $('screen-title').style.display = 'none';
-      $('hud').style.display = 'block';
-    },
-    showPause() {
-      $('screen-pause').style.display = 'flex';
-      menus.fillStats();
-    },
-    hidePause() {
-      $('screen-pause').style.display = 'none';
-    },
-    showShop() {
-      $('screen-shop').style.display = 'flex';
-      menus.fillShop();
-    },
-    hideShop() {
-      $('screen-shop').style.display = 'none';
-    },
+    hideTitle() { show('screen-title', 'none'); show('hud', 'block'); },
+    showPause() { show('screen-pause', 'flex'); menus.fillStats(); },
+    hidePause() { show('screen-pause', 'none'); },
+    showShop() { show('screen-shop', 'flex'); menus.fillShop(); },
+    hideShop() { show('screen-shop', 'none'); },
     refreshSlots() {
       const list = $('save-slots');
       if (!list) return;
@@ -127,20 +112,14 @@ export function createMenus(game) {
       });
     },
     wire() {
-      const startBtn = $('btn-start');
-      if (startBtn) startBtn.addEventListener('click', () => { menus.hideTitle(); game.startPlay(); });
-      const continueBtn = $('btn-continue');
-      if (continueBtn) continueBtn.addEventListener('click', () => { menus.hideTitle(); game.startPlay(); });
-      const resumeBtn = $('btn-resume');
-      if (resumeBtn) resumeBtn.addEventListener('click', () => { menus.hidePause(); game.resume(); });
-      const quitBtn = $('btn-quit');
-      if (quitBtn) quitBtn.addEventListener('click', () => { game.save.save(0); menus.hidePause(); menus.showTitle(); game.toTitle(); });
-      const shopBtn = $('btn-shop');
-      if (shopBtn) shopBtn.addEventListener('click', () => { menus.showShop(); });
-      const shopClose = $('btn-shop-close');
-      if (shopClose) shopClose.addEventListener('click', () => { menus.hideShop(); });
-      const saveBtn = $('btn-save');
-      if (saveBtn) saveBtn.addEventListener('click', () => { game.save.save(0); game.ui.showToast('Saved to slot 1'); });
+      const on = (id, fn) => { const b = $(id); if (b) b.addEventListener('click', fn); };
+      on('btn-start', () => { menus.hideTitle(); game.startPlay(); });
+      on('btn-continue', () => { menus.hideTitle(); game.startPlay(); });
+      on('btn-resume', () => { menus.hidePause(); game.resume(); });
+      on('btn-quit', () => { game.save.save(0); menus.hidePause(); menus.showTitle(); game.toTitle(); });
+      on('btn-shop', () => { menus.showShop(); });
+      on('btn-shop-close', () => { menus.hideShop(); });
+      on('btn-save', () => { game.save.save(0); game.ui.showToast('Saved to slot 1'); });
     },
   };
   return menus;

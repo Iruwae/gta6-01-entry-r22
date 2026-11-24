@@ -8,14 +8,10 @@ export function createMissionRunner(game) {
     guards: [],
     rival: null,
     missionList() {
-      return MISSIONS.map((m) => ({
-        id: m.id,
-        title: m.title,
-        giver: m.giver,
-        reward: m.reward,
-        done: game.save.data.missionsDone.includes(m.id),
-        available: !game.save.data.missionsDone.includes(m.id) && (!rn.active || rn.active.id === m.id),
-      }));
+      return MISSIONS.map((m) => {
+        const done = game.save.data.missionsDone.includes(m.id);
+        return { id: m.id, title: m.title, giver: m.giver, reward: m.reward, done, available: !done && (!rn.active || rn.active.id === m.id) };
+      });
     },
     currentStage() {
       if (!rn.active) return null;

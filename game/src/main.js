@@ -152,31 +152,20 @@ export function createGame() {
       } else game.bustedTimer = 0;
     }
   };
-  game.wasted = () => {
+  function respawn(placeId, fine, msg, eject) {
     const p = game.player;
-    p.money = Math.max(0, p.money - 100);
-    p.health = 100;
-    p.armor = 0;
-    game.wanted.set(0);
-    game.dispatch.clearUnits();
-    if (p.vehicle) { p.vehicle.driver = null; p.vehicle = null; p.onFoot = true; p.model.visible = true; }
-    const hosp = game.plan.placeById.get('hospital');
-    p.placeAt(hosp.x, hosp.z, 0);
-    game.ui.showToast('WASTED — you woke up at Solmar General, -$100');
-    game.camera.snap({ x: hosp.x, z: hosp.z, y: 0 }, 0);
-  };
-  game.busted = () => {
-    const p = game.player;
-    p.money = Math.max(0, p.money - 150);
+    p.money = Math.max(0, p.money - fine);
     p.health = 100;
     game.wanted.set(0);
     game.dispatch.clearUnits();
-    game.bustedTimer = 0;
-    const hq = game.plan.placeById.get('hq');
-    p.placeAt(hq.x, hq.z, 0);
-    game.ui.showToast('BUSTED — SBPD let you go, -$150');
-    game.camera.snap({ x: hq.x, z: hq.z, y: 0 }, 0);
-  };
+    if (eject && p.vehicle) { p.vehicle.driver = null; p.vehicle = null; p.onFoot = true; p.model.visible = true; }
+    const at = game.plan.placeById.get(placeId);
+    p.placeAt(at.x, at.z, 0);
+    game.ui.showToast(msg);
+    game.camera.snap({ x: at.x, z: at.z, y: 0 }, 0);
+  }
+  game.wasted = () => { game.player.armor = 0; respawn('hospital', 100, 'WASTED — you woke up at Solmar General, -$100', true); };
+  game.busted = () => { game.bustedTimer = 0; respawn('hq', 150, 'BUSTED — SBPD let you go, -$150', false); };
   game.startPlay = () => {
     game.mode = 'play';
     const p = game.player;
@@ -197,21 +186,20 @@ export function createGame() {
   };
   game.load = (i) => game.save.load(i);
   game.crewAbility = (key) => {
+    const labels = { getaway: 'Getaway', fix: 'Quick Fix', eyes: 'Eyes Out' };
+    if (game.crewCooldown[key] > 0) { game.ui.showToast(`${labels[key]} ready in ${Math.ceil(game.crewCooldown[key])}s`); return; }
     if (key === 'getaway') {
-      if (game.crewCooldown.getaway > 0) { game.ui.showToast(`Getaway ready in ${Math.ceil(game.crewCooldown.getaway)}s`); return; }
       if (game.wanted.level === 0) { game.ui.showToast('No heat to lose'); return; }
       game.wanted.set(game.wanted.level - 1);
       game.crewCooldown.getaway = 60;
       game.ui.showToast('PILAR — getaway route clear, heat down');
     } else if (key === 'fix') {
-      if (game.crewCooldown.fix > 0) { game.ui.showToast(`Quick Fix ready in ${Math.ceil(game.crewCooldown.fix)}s`); return; }
       const v = game.player.vehicle;
       if (!v) { game.ui.showToast('No car to fix'); return; }
       v.condition = 100; v.health = 100; v.burnTimer = 0;
       game.crewCooldown.fix = 45;
       game.ui.showToast('VIC — car patched up, good as new');
     } else if (key === 'eyes') {
-      if (game.crewCooldown.eyes > 0) { game.ui.showToast(`Eyes Out ready in ${Math.ceil(game.crewCooldown.eyes)}s`); return; }
       game.eyesOut = true;
       game.crewCooldown.eyes = 30;
       game.ui.showToast('JUNO — police positions marked');

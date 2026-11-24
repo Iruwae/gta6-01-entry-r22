@@ -7,24 +7,20 @@ export function mulberry32(seed) {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
-function hashLabel(label) {
+function hashLabel(s) {
   let h = 2166136261;
-  for (let i = 0; i < label.length; i++) {
-    h ^= label.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
   return h >>> 0;
 }
 export function createRng(seed) {
   const next = mulberry32(seed);
   const api = {
-    seed,
-    next,
-    range(min, max) { return min + next() * (max - min); },
-    int(min, max) { return Math.floor(api.range(min, max + 1)); },
-    pick(list) { return list[Math.floor(next() * list.length)]; },
-    chance(p) { return next() < p; },
-    fork(label) { return createRng((seed ^ hashLabel(label)) >>> 0); },
+    seed, next,
+    range: (a, b) => a + next() * (b - a),
+    int: (a, b) => Math.floor(api.range(a, b + 1)),
+    pick: (l) => l[Math.floor(next() * l.length)],
+    chance: (p) => next() < p,
+    fork: (s) => createRng((seed ^ hashLabel(s)) >>> 0),
   };
   return api;
 }

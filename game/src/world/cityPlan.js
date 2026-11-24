@@ -5,7 +5,6 @@ export function createCityPlan(rng) {
   const ROAD_W = 16;
   const X0 = -450;
   const Z0 = -360;
-  const WATER_Y = -0.7;
   const junctions = [];
   for (let r = 0; r < ROWS; r++) {
     for (let c = 0; c < COLS; c++) {
@@ -42,14 +41,14 @@ export function createCityPlan(rng) {
     return out;
   }
   const DISTRICTS = [
-    { name: 'PALMERA STRAND', lot: '#d9c48a', map: '#e8c96a', style: 'deco', palms: 1.0, lamps: 1.0 },
-    { name: 'SUNDIAL SQUARE', lot: '#b8b2a4', map: '#c9a86a', style: 'glass', palms: 0.5, lamps: 1.0 },
-    { name: 'VIDRIO HEIGHTS', lot: '#a8b8c8', map: '#7fb2d9', style: 'glass', palms: 0.5, lamps: 1.0 },
-    { name: 'OLD CANNERY', lot: '#a89a7a', map: '#c98a5a', style: 'shop', palms: 0.5, lamps: 0.9 },
-    { name: 'MARINA ROW', lot: '#c8b89a', map: '#7fc9c9', style: 'deco', palms: 0.9, lamps: 1.0 },
-    { name: 'SALTFLATS PORT', lot: '#8a8578', map: '#9a9a8a', style: 'warehouse', palms: 0.15, lamps: 0.8 },
-    { name: 'SEAGLASS BEACH', lot: '#e0d0a0', map: '#f0d890', style: 'villa', palms: 1.0, lamps: 0.9 },
-    { name: 'CORAL KEYS', lot: '#d8c8a8', map: '#f0b090', style: 'villa', palms: 0.9, lamps: 0.9 },
+    { name: 'PALMERA STRAND', lot: '#d9c48a', style: 'deco', palms: 1.0, lamps: 1.0 },
+    { name: 'SUNDIAL SQUARE', lot: '#b8b2a4', style: 'glass', palms: 0.5, lamps: 1.0 },
+    { name: 'VIDRIO HEIGHTS', lot: '#a8b8c8', style: 'glass', palms: 0.5, lamps: 1.0 },
+    { name: 'OLD CANNERY', lot: '#a89a7a', style: 'shop', palms: 0.5, lamps: 0.9 },
+    { name: 'MARINA ROW', lot: '#c8b89a', style: 'deco', palms: 0.9, lamps: 1.0 },
+    { name: 'SALTFLATS PORT', lot: '#8a8578', style: 'warehouse', palms: 0.15, lamps: 0.8 },
+    { name: 'SEAGLASS BEACH', lot: '#e0d0a0', style: 'villa', palms: 1.0, lamps: 0.9 },
+    { name: 'CORAL KEYS', lot: '#d8c8a8', style: 'villa', palms: 0.9, lamps: 0.9 },
   ];
   function districtOfBlock(bx, bz) {
     if (bx >= 10) return 7;
@@ -71,24 +70,24 @@ export function createCityPlan(rng) {
     return DISTRICTS[districtOfBlock(bx, bz)];
   }
   const PLACES = [
-    { id: 'garage', name: "Lena's Garage", kind: 'safehouse', x: -410, z: 300 },
-    { id: 'diner', name: 'La Rosa Diner', kind: 'diner', x: -320, z: 120 },
-    { id: 'chopshop', name: 'Chop Shop', kind: 'chopshop', x: -410, z: -300 },
-    { id: 'gunshop', name: 'Iron & Lead', kind: 'gunshop', x: 130, z: 210 },
-    { id: 'respray', name: 'Respray', kind: 'respray', x: 220, z: -240 },
-    { id: 'hospital', name: 'Bayside Clinic', kind: 'hospital', x: 310, z: -330 },
-    { id: 'hq', name: 'SBPD HQ', kind: 'police', x: 40, z: -330 },
-    { id: 'tower', name: 'Vane Tower', kind: 'tower', x: 130, z: -60 },
-    { id: 'club', name: 'Club Neon Tide', kind: 'club', x: 400, z: 30 },
-    { id: 'piergate', name: 'Pier Gate', kind: 'pier', x: 470, z: 135 },
-    { id: 'pierend', name: 'Palmera Wheel', kind: 'pier', x: 630, z: 135 },
-    { id: 'docks', name: 'Saltflats Docks', kind: 'docks', x: -230, z: 400 },
-    { id: 'radio', name: 'Sunset Radio', kind: 'radio', x: -140, z: -150 },
-    { id: 'lighthouse', name: 'Keys Lighthouse', kind: 'lighthouse', x: 940, z: -200 },
-    { id: 'marina', name: 'Marina Row', kind: 'marina', x: 430, z: 210 },
-    { id: 'villa', name: 'Vane Villa', kind: 'villa', x: 850, z: -40 },
-    { id: 'market', name: 'Night Market', kind: 'market', x: -230, z: -60 },
-    { id: 'park', name: 'Flamingo Park', kind: 'park', x: -50, z: 120 },
+    { id: 'garage', name: "Lena's Garage", x: -410, z: 300 },
+    { id: 'diner', name: 'La Rosa Diner', x: -320, z: 120 },
+    { id: 'chopshop', name: 'Chop Shop', x: -410, z: -300 },
+    { id: 'gunshop', name: 'Iron & Lead', x: 130, z: 210 },
+    { id: 'respray', name: 'Respray', x: 220, z: -240 },
+    { id: 'hospital', name: 'Bayside Clinic', x: 310, z: -330 },
+    { id: 'hq', name: 'SBPD HQ', x: 40, z: -330 },
+    { id: 'tower', name: 'Vane Tower', x: 130, z: -60 },
+    { id: 'club', name: 'Club Neon Tide', x: 400, z: 30 },
+    { id: 'piergate', name: 'Pier Gate', x: 470, z: 135 },
+    { id: 'pierend', name: 'Palmera Wheel', x: 630, z: 135 },
+    { id: 'docks', name: 'Saltflats Docks', x: -230, z: 400 },
+    { id: 'radio', name: 'Sunset Radio', x: -140, z: -150 },
+    { id: 'lighthouse', name: 'Keys Lighthouse', x: 940, z: -200 },
+    { id: 'marina', name: 'Marina Row', x: 430, z: 210 },
+    { id: 'villa', name: 'Vane Villa', x: 850, z: -40 },
+    { id: 'market', name: 'Night Market', x: -230, z: -60 },
+    { id: 'park', name: 'Flamingo Park', x: -50, z: 120 },
   ];
   const placeById = new Map(PLACES.map((p) => [p.id, p]));
   function groundHeight(x, z) {
@@ -181,7 +180,7 @@ export function createCityPlan(rng) {
     return best || { x, z };
   }
   return {
-    COLS, ROWS, SPACING, ROAD_W, X0, Z0, WATER_Y,
+    COLS, ROWS, SPACING, ROAD_W, X0, Z0,
     junctions, byId, neighbours, DISTRICTS, districtOfBlock, districtAt,
     PLACES, placeById, groundHeight, nearestJunction,
     pointAlongRoad, nextWander, pursuitNext, landClamp,

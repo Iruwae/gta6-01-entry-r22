@@ -65,36 +65,20 @@ export function createPoliceDispatch(game) {
     },
     hide() { hel.active = false; hg.visible = false; },
   };
+  function mkUnit(v, tactic) {
+    const unit = { vehicle: v, name: UNIT_NAMES[nameIdx++ % UNIT_NAMES.length], tactic, from: plan.nearestJunction(v.position.x, v.position.z).id, to: plan.nearestJunction(game.player.position.x, game.player.position.z).id, along: 0, searchX: 0, searchZ: 0 };
+    units.push(unit);
+    return unit;
+  }
   function spawnUnit(specKey = 'interceptor') {
     const hq = plan.placeById.get('hq');
     const v = fleet.spawn(specKey, hq.x + rng.range(-10, 10), hq.z + rng.range(-10, 10), rng.range(0, 6));
     v.parked = false;
-    const unit = {
-      vehicle: v,
-      name: UNIT_NAMES[nameIdx++ % UNIT_NAMES.length],
-      tactic: rng.pick(TACTICS),
-      from: plan.nearestJunction(v.position.x, v.position.z).id,
-      to: plan.nearestJunction(game.player.position.x, game.player.position.z).id,
-      along: 0,
-      searchX: 0,
-      searchZ: 0,
-    };
-    units.push(unit);
-    return unit;
+    return mkUnit(v, rng.pick(TACTICS));
   }
-  function takeUpPursuit(v) {
-    const unit = {
-      vehicle: v,
-      name: UNIT_NAMES[nameIdx++ % UNIT_NAMES.length],
-      tactic: 'RAMMING',
-      from: plan.nearestJunction(v.position.x, v.position.z).id,
-      to: plan.nearestJunction(game.player.position.x, game.player.position.z).id,
-      along: 0,
-      searchX: 0,
-      searchZ: 0,
-    };
-    units.push(unit);
-    return unit;
+  function takeUpPursuit(v) { return mkUnit(v, 'RAMMING'); }
+  function clearRoadblocks() {
+    for (const r of [...rb]) { scene.remove(r.mesh); fleet.remove(r.vehicle); rb.splice(rb.indexOf(r), 1); }
   }
   function clearUnits() {
     for (const u of [...units]) {
@@ -102,10 +86,7 @@ export function createPoliceDispatch(game) {
       units.splice(units.indexOf(u), 1);
     }
     hel.hide();
-    for (const r of [...rb]) {
-      scene.remove(r.mesh);
-      rb.splice(rb.indexOf(r), 1);
-    }
+    clearRoadblocks();
   }
   function placeRoadblock(count = 1) {
     const p = game.player;
@@ -113,14 +94,12 @@ export function createPoliceDispatch(game) {
     for (let i = 0; i < count; i++) {
       const x = ahead.x + rng.range(-14, 14);
       const z = ahead.z + rng.range(-14, 14);
-      const mesh = new THREE.Group();
       const car = fleet.spawn('bulwark', x, z, rng.range(0, 6));
       car.parked = true;
       const barrier = new THREE.Mesh(new THREE.BoxGeometry(7, 1, 0.4), new THREE.MeshStandardMaterial({ color: 0xff7a2e }));
       barrier.position.set(x, 1, z);
       barrier.rotation.y = rng.range(0, 3);
       scene.add(barrier);
-      mesh.add(barrier);
       rb.push({ x, z, mesh: barrier, vehicle: car });
       game.bus.emit('roadblock', { x, z });
     }
@@ -143,15 +122,12 @@ export function createPoliceDispatch(game) {
     if (wanted >= 4) hel.active = true, hel.group.visible = true;
     else if (wanted < 4) hel.hide();
     if (wanted >= 3 && rb.length === 0) placeRoadblock(1);
-    if (wanted < 3) {
-      for (const r of [...rb]) { scene.remove(r.mesh); fleet.remove(r.vehicle); rb.splice(rb.indexOf(r), 1); }
-    }
+    if (wanted < 3) clearRoadblocks();
     const p = game.player;
     let anySees = false;
     for (const u of units) {
       const v = u.vehicle;
       if (v.wrecked) continue;
-      const target = p.vehicle || p;
       const tp = p.vehicle ? p.vehicle.position : p.position;
       const dx = tp.x - v.position.x;
       const dz = tp.z - v.position.z;
@@ -172,8 +148,7 @@ export function createPoliceDispatch(game) {
       while (dh < -Math.PI) dh += Math.PI * 2;
       const steer = Math.max(-1, Math.min(1, dh * 2.4));
       let forward = 1;
-      if (u.tactic === 'RAMMING' && dist < 8) forward = 1;
-      else if (dist < 6) forward = 0.4;
+      if (dist < 6) forward = 0.4;
       stepVehicle(v, { forward, steer, handbrake: false }, dt, plan.groundHeight, game.collision);
       u.along += Math.max(0, v.speed) * dt;
       const segLen = Math.hypot(plan.byId.get(u.to).x - plan.byId.get(u.from).x, plan.byId.get(u.to).z - plan.byId.get(u.from).z);

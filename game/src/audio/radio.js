@@ -4,28 +4,12 @@ const STATIONS = [
   { key: '3', name: 'NEON 104.7', dj: 'Night Drive', tracks: ['Chrome Hearts', 'Boulevard Run', 'Vane City', 'Last Exit'] },
 ];
 export function createRadio(game) {
-  const radio = {
-    station: 0,
-    trackIndex: 0,
-    trackTimer: 0,
-    line() {
-      const s = STATIONS[radio.station];
-      return `${s.name} — ${s.tracks[radio.trackIndex]} · ${s.dj}`;
-    },
-    switchTo(i) {
-      radio.station = ((i % STATIONS.length) + STATIONS.length) % STATIONS.length;
-      radio.trackIndex = 0;
-      radio.trackTimer = 0;
-      game.ui.showToast(STATIONS[radio.station].name);
-    },
-    nextTrack() {
-      radio.trackIndex = (radio.trackIndex + 1) % STATIONS[radio.station].tracks.length;
-      radio.trackTimer = 0;
-    },
-    step(dt) {
-      radio.trackTimer += dt;
-      if (radio.trackTimer > 40) radio.nextTrack();
-    },
+  const r = {
+    station: 0, trackIndex: 0, trackTimer: 0,
+    line() { const s = STATIONS[r.station]; return `${s.name} — ${s.tracks[r.trackIndex]} · ${s.dj}`; },
+    switchTo(i) { r.station = ((i % 3) + 3) % 3; r.trackIndex = 0; r.trackTimer = 0; game.ui.showToast(STATIONS[r.station].name); },
+    nextTrack() { r.trackIndex = (r.trackIndex + 1) % STATIONS[r.station].tracks.length; r.trackTimer = 0; },
+    step(dt) { r.trackTimer += dt; if (r.trackTimer > 40) r.nextTrack(); },
   };
-  return radio;
+  return r;
 }

@@ -42,10 +42,7 @@ export function createActivities(game) {
       game.player.money -= 150;
       const j = game.plan.nearestJunction(p.position.x, p.position.z);
       const cps = [];
-      for (let i = 1; i <= 3; i++) {
-        const cj = game.plan.nearestJunction(p.position.x + game.rng.range(-400, 400) * i, p.position.z + game.rng.range(-400, 400) * i);
-        cps.push(cj);
-      }
+      for (let i = 1; i <= 3; i++) cps.push(game.plan.nearestJunction(p.position.x + game.rng.range(-400, 400) * i, p.position.z + game.rng.range(-400, 400) * i));
       const rival = game.fleet.spawn('marisol', j.x - 8, j.z, 1.2, 'race-rival');
       rival.parked = false;
       acts.race = { checkpoints: cps, index: 0, rival, timer: 0 };

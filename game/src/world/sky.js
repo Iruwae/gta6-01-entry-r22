@@ -61,9 +61,9 @@ export function createSky(scene, rng) {
   const gr = cg.createRadialGradient(16, 16, 2, 16, 16, 15);
   gr.addColorStop(0, 'rgba(255,255,255,0.9)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
   cg.fillStyle = gr; cg.fillRect(0, 0, 32, 32);
-  const cloudMat = new THREE.SpriteMaterial({ color: 0xffffff, transparent: true, opacity: 0.4, map: new THREE.CanvasTexture(cc), fog: false, depthWrite: false });
+  const cloudMat = new THREE.SpriteMaterial({ color: 0xffffff, transparent: true, opacity: 0.5, map: new THREE.CanvasTexture(cc), fog: false, depthWrite: false });
   const clouds = [];
-  for (let i = 0; i < 26; i++) {
+  for (let i = 0; i < 34; i++) {
     const s = new THREE.Sprite(cloudMat.clone());
     const sc = rng.range(180, 420);
     s.scale.set(sc, sc * 0.32, 1);
