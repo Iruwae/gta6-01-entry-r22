@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+const WHITE = new THREE.Color(0xffffff);
 const KEYFRAMES = [
   [0, 0x060a1e, 0x0d1330, 0x223055, 0.25, 0.35],
   [6.5, 0x2a4a7a, 0xff9d5c, 0xffc98a, 0.7, 0.55],
@@ -55,7 +56,12 @@ export function createSky(scene, rng) {
   const starMat = new THREE.PointsMaterial({ color: 0xffffff, size: 2.2, sizeAttenuation: false, transparent: true, opacity: 0, fog: false });
   const stars = new THREE.Points(starGeo, starMat);
   scene.add(stars);
-  const cloudMat = new THREE.SpriteMaterial({ color: 0xffffff, transparent: true, opacity: 0.55, fog: false, depthWrite: false });
+  const cc = document.createElement('canvas'); cc.width = cc.height = 32;
+  const cg = cc.getContext('2d');
+  const gr = cg.createRadialGradient(16, 16, 2, 16, 16, 15);
+  gr.addColorStop(0, 'rgba(255,255,255,0.9)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+  cg.fillStyle = gr; cg.fillRect(0, 0, 32, 32);
+  const cloudMat = new THREE.SpriteMaterial({ color: 0xffffff, transparent: true, opacity: 0.4, map: new THREE.CanvasTexture(cc), fog: false, depthWrite: false });
   const clouds = [];
   for (let i = 0; i < 26; i++) {
     const s = new THREE.Sprite(cloudMat.clone());
@@ -127,6 +133,7 @@ export function createSky(scene, rng) {
       for (const c of clouds) {
         c.position.x += c.userData.speed * 0.016;
         if (c.position.x > 2000) c.position.x = -2000;
+        c.material.color.copy(k.horizon).lerp(WHITE, 0.3);
       }
       return { nightFactor, lowSun };
     },

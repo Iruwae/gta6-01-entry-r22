@@ -126,8 +126,9 @@ export function createPoliceDispatch(game) {
     }
   }
   function rowsForHud() {
+    const tp = game.player.vehicle ? game.player.vehicle.position : game.player.position;
     return units.slice(0, 5).map((u) => {
-      const d = Math.round(Math.hypot(u.vehicle.position.x - game.player.position.x, u.vehicle.position.z - game.player.position.z));
+      const d = Math.round(Math.hypot(u.vehicle.position.x - tp.x, u.vehicle.position.z - tp.z));
       return { name: u.name, dist: d, tactic: u.tactic };
     });
   }

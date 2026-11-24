@@ -5,7 +5,7 @@ const PANTS = [0x2a2f3a, 0x3a3f4a, 0x5a4a3a, 0x2e4a3a, 0x4a2e3a];
 export function createPedestrianSystem(game) {
   const { plan, collision, rng, scene } = game;
   const npcs = [];
-  const MAX_NPCS = 42;
+  const MAX_NPCS = 90;
   function spawn(x, z, role = 'civilian') {
     const model = createPlayerModel({
       skin: rng.pick(SKINS),
@@ -33,7 +33,7 @@ export function createPedestrianSystem(game) {
   function civilians() { return npcs.filter((n) => n.role === 'civilian' && !n.dead); }
   function populate() {
     const p = game.player;
-    while (civilians().length < 26) {
+    while (civilians().length < 64) {
       const j = plan.nearestJunction(p.position.x + rng.range(-120, 120), p.position.z + rng.range(-120, 120));
       spawn(j.x + rng.range(-25, 25), j.z + rng.range(-25, 25));
     }
@@ -100,7 +100,7 @@ export function createPedestrianSystem(game) {
       n.model.position.set(n.position.x, plan.groundHeight(n.position.x, n.position.z), n.position.z);
       n.model.rotation.y = n.heading;
     }
-    while (civilians().length < 26) {
+    while (civilians().length < 64) {
       const j = plan.nearestJunction(p.position.x + rng.range(-120, 120), p.position.z + rng.range(-120, 120));
       spawn(j.x + rng.range(-25, 25), j.z + rng.range(-25, 25));
     }

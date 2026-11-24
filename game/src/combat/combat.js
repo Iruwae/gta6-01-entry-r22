@@ -17,7 +17,12 @@ export function createCombat(game) {
     tracers.push({ line: flash, life: 0.06, isLight: true });
   }
   function explodeAt(pos, radius = 9, damage = 90) {
-    const fire = new THREE.Mesh(new THREE.SphereGeometry(2.2, 12, 10), new THREE.MeshBasicMaterial({ color: 0xffa22e, transparent: true, opacity: 0.95 }));
+    const fire = new THREE.Group();
+    [[1.6, 0xfff2a8, 0.95], [2.8, 0xff7a2e, 0.9]].forEach(([r, c, o]) => {
+      const m = new THREE.Mesh(new THREE.SphereGeometry(r, 10, 8), new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: o }));
+      m.userData.o = o;
+      fire.add(m);
+    });
     fire.position.set(pos.x, (pos.y ?? 0) + 1.2, pos.z);
     scene.add(fire);
     const light = new THREE.PointLight(0xff7a2e, 40, 40);
@@ -131,7 +136,7 @@ export function createCombat(game) {
       } else if (t.isFire) {
         const k = 1 + (0.7 - t.life) * 2.2;
         t.line.scale.set(k, k, k);
-        t.line.material.opacity = Math.max(0, t.life / 0.7);
+        for (const m of t.line.children) m.material.opacity = Math.max(0, t.life / 0.7) * m.userData.o;
       } else if (t.isLight) {
         t.line.intensity = Math.max(0, t.life * 60);
       } else {

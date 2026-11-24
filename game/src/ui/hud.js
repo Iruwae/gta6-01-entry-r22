@@ -46,7 +46,7 @@ export function createHud(game) {
           return `<div class="${cls.join(' ')}"><span class="weapon-name">${w.name}</span><span class="weapon-ammo">${w.locked ? 'LOCKED' : w.ammo}</span></div>`;
         }).join('');
       }
-      if (els.respect) els.respect.textContent = game.respect.rank().name;
+      if (els.respect) els.respect.textContent = 'RANK · ' + game.respect.rank().name;
       if (els.respectBar) els.respectBar.style.width = Math.round(game.respect.progress() * 100) + '%';
       const rows = game.dispatch.rowsForHud();
       if (els.dispatch) els.dispatch.style.display = rows.length ? 'block' : 'none';

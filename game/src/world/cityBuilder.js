@@ -251,19 +251,21 @@ export function buildCity(scene, plan, collision, rng) {
       if (style === 'glass') {
         const bw = sr.range(20, 30);
         const bd = sr.range(20, 30);
-        const h1 = sr.range(8, 14);
+        const h1 = sr.range(14, 26);
         addBuilding(cx, cz, bw, bd, h1, 'glass', sr);
         let w = bw * 0.78; let d = bd * 0.78; let y = h1;
-        const tiers = sr.int(2, 3);
+        const tiers = sr.int(3, 4);
         for (let t = 0; t < tiers; t++) {
-          const th = sr.range(10, 18);
+          const th = sr.range(12, 22);
           addBuilding(cx, cz, w, d, y + th / 2 + 0.15, 'glass', sr);
           y += th; w *= 0.78; d *= 0.78;
         }
+        const w2 = sr.range(14, 20);
+        addBuilding(cx + 26, cz - 22, w2, w2, sr.range(18, 34), 'glass', sr);
         cb.add(bg, m4(cx, y + 4, cz, 0, 1.2, 8, 1.2), '#c8ccd8');
         cb.add(bg, m4(cx, y + 8.5, cz, 0, 0.8, 0.8, 0.8), '#ff3b3b');
       } else if (style === 'deco') {
-        const n = sr.int(1, 2);
+        const n = sr.int(2, 3);
         for (let i = 0; i < n; i++) {
           const w = sr.range(14, 22); const d = sr.range(12, 18); const h = sr.range(12, 34);
           const ox = (i - (n - 1) / 2) * 24;
@@ -271,30 +273,29 @@ export function buildCity(scene, plan, collision, rng) {
           cb.add(bg, m4(cx + ox, h + 1, cz, 0, 1, 4, w * 0.4), sr.pick(STYLE_COLORS.deco));
         }
       } else if (style === 'shop') {
-        const n = sr.int(2, 3);
+        const n = sr.int(4, 5);
         for (let i = 0; i < n; i++) {
           const w = sr.range(10, 16); const d = sr.range(9, 13); const h = sr.range(6, 12);
-          addBuilding(cx + (i - 1) * 20, cz + (i % 2) * 8 - 4, w, d, h, 'shop', sr);
-          cb.add(bg, m4(cx + (i - 1) * 20, 1.2, cz + d / 2 + 1, 0, w * 0.8, 0.3, 1.6), sr.pick(STYLE_COLORS.shop));
+          addBuilding(cx + (i - (n - 1) / 2) * 14, cz + (i % 2) * 8 - 4, w, d, h, 'shop', sr);
+          cb.add(bg, m4(cx + (i - (n - 1) / 2) * 14, 1.2, cz + d / 2 + 1, 0, w * 0.8, 0.3, 1.6), sr.pick(STYLE_COLORS.shop));
         }
       } else if (style === 'villa') {
-        for (let i = 0; i < 4; i++) {
-          const ox = (i % 2 - 0.5) * 30; const oz = (Math.floor(i / 2) - 0.5) * 30;
+        for (let i = 0; i < 6; i++) {
+          const ox = (i % 3 - 1) * 22; const oz = (Math.floor(i / 3) - 0.5) * 24;
           addBuilding(cx + ox, cz + oz, sr.range(9, 13), sr.range(9, 13), sr.range(5, 8), 'villa', sr);
           cb.add(bg, m4(cx + ox, 0.4, cz + oz + 10, 0, 5, 0.5, 3), '#4a9a9a');
         }
       } else if (style === 'warehouse') {
-        if (sr.chance(0.5)) {
-          addBuilding(cx, cz, sr.range(24, 34), sr.range(16, 22), sr.range(8, 13), 'warehouse', sr);
-        } else {
+        addBuilding(cx, cz, sr.range(24, 34), sr.range(16, 22), sr.range(10, 16), 'warehouse', sr);
+        {
           const cols = ['#c95a3a', '#3a7ac9', '#3a9a5a', '#c9a83a', '#8a5ac9', '#c97a3a'];
           for (let i = 0; i < 8; i++) {
             if (sr.chance(0.3)) continue;
             const stack = sr.int(1, 3);
             for (let s = 0; s < stack; s++) {
-              cb.add(bg, m4(cx - 20 + (i % 4) * 13, 1.4 + s * 2.8, cz - 12 + Math.floor(i / 4) * 14, 0, 12, 2.6, 2.6), cols[i % 6]);
+              cb.add(bg, m4(cx - 20 + (i % 4) * 13, 1.4 + s * 2.8, cz + 16 + Math.floor(i / 4) * 14, 0, 12, 2.6, 2.6), cols[i % 6]);
             }
-            collision.registerBox(cx - 26 + (i % 4) * 13, cz - 13.3 + Math.floor(i / 4) * 14, cx - 14 + (i % 4) * 13, cz - 10.7 + Math.floor(i / 4) * 14, 8, 'solid');
+            collision.registerBox(cx - 26 + (i % 4) * 13, cz + 14.7 + Math.floor(i / 4) * 14, cx - 14 + (i % 4) * 13, cz + 17.3 + Math.floor(i / 4) * 14, 8, 'solid');
           }
         }
       }
@@ -339,7 +340,7 @@ export function buildCity(scene, plan, collision, rng) {
   for (let bx = 0; bx < 10; bx++) {
     for (let bz = 0; bz < 8; bz++) {
       const d = plan.DISTRICTS[plan.districtOfBlock(bx, bz)];
-      const n = Math.round(6 * d.palms);
+      const n = Math.round(16 * d.palms);
       for (let i = 0; i < n; i++) {
         const cx = plan.X0 + bx * plan.SPACING + palmRng.range(10, 80);
         const cz = plan.Z0 + bz * plan.SPACING + palmRng.range(10, 80);
@@ -374,26 +375,42 @@ export function buildCity(scene, plan, collision, rng) {
     group.add(trunks, crowns);
   }
   {
+    const tr = rng.fork('trees');
+    const sp = [];
+    for (let c = 0; c < 11; c++) for (let z = plan.Z0 + 30; z < plan.Z0 + 720; z += 45) for (const s of [-11, 11]) sp.push([plan.X0 + c * 90 + s, z]);
+    for (let r = 0; r < 9; r++) for (let x = plan.X0 + 30; x < plan.X0 + 900; x += 45) for (const s of [-11, 11]) sp.push([x, plan.Z0 + r * 90 + s]);
+    const kp = sp.filter(([x, z]) => !collision.solidAt(x, z, 1));
+    const dm = new THREE.Object3D();
+    const tk = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.16, 0.26, 3, 5), new THREE.MeshStandardMaterial({ color: 0x5a4028, roughness: 1 }), kp.length);
+    const cr = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(2.4, 0), new THREE.MeshStandardMaterial({ color: 0x3a7a3a, roughness: 1, flatShading: true }), kp.length);
+    kp.forEach(([x, z], i) => {
+      const h = 2.6 + tr.range(0, 1.4);
+      dm.position.set(x, h / 2, z); dm.rotation.set(0, 0, 0); dm.scale.set(1, h / 3, 1); dm.updateMatrix(); tk.setMatrixAt(i, dm.matrix);
+      dm.position.set(x, h + 1.6, z); dm.rotation.set(0, tr.range(0, 6), 0); dm.scale.set(1, 1, 1); dm.updateMatrix(); cr.setMatrixAt(i, dm.matrix);
+    });
+    group.add(tk, cr);
+  }
+  {
     const lampGeo = new THREE.CylinderGeometry(0.09, 0.12, 7.4, 5);
     const lampMat = new THREE.MeshStandardMaterial({ color: 0x2a2f3a, roughness: 0.8 });
     const spots = [];
     for (let bx = 0; bx < 10; bx++) for (let bz = 0; bz < 8; bz++) {
-      for (let i = 0; i < 4; i++) {
-        spots.push({ x: plan.X0 + bx * plan.SPACING + 8 + (i % 2) * 74, z: plan.Z0 + bz * plan.SPACING + 8 + Math.floor(i / 2) * 74 });
+      for (const [ox, oz] of [[8, 8], [82, 8], [8, 82], [82, 82], [45, 8], [45, 82], [8, 45], [82, 45]]) {
+        spots.push({ x: plan.X0 + bx * plan.SPACING + ox, z: plan.Z0 + bz * plan.SPACING + oz });
       }
     }
     const lamps = new THREE.InstancedMesh(lampGeo, lampMat, spots.length);
     const dm = new THREE.Object3D();
     spots.forEach((s, i) => { dm.position.set(s.x, 3.7, s.z); dm.rotation.set(0, 0, 0); dm.scale.set(1, 1, 1); dm.updateMatrix(); lamps.setMatrixAt(i, dm.matrix); });
     group.add(lamps);
-    const glowGeo = new THREE.BufferGeometry();
-    const gp = new Float32Array(spots.length * 3);
-    spots.forEach((s, i) => { gp[i * 3] = s.x; gp[i * 3 + 1] = 7.4; gp[i * 3 + 2] = s.z; });
-    glowGeo.setAttribute('position', new THREE.BufferAttribute(gp, 3));
-    const glowMat = new THREE.PointsMaterial({ color: 0xffd98a, size: 3.2, sizeAttenuation: true, transparent: true, opacity: 0, depthWrite: false });
-    const glows = new THREE.Points(glowGeo, glowMat);
-    group.add(glows);
-    group.userData.lg = glowMat;
+    const heads = new THREE.InstancedMesh(new THREE.SphereGeometry(0.32, 8, 6), new THREE.MeshBasicMaterial({ color: 0xffd98a }), spots.length);
+    spots.forEach((s, i) => { dm.position.set(s.x, 7.4, s.z); dm.rotation.set(0, 0, 0); dm.scale.set(1, 1, 1); dm.updateMatrix(); heads.setMatrixAt(i, dm.matrix); });
+    group.add(heads);
+    const poolMat = new THREE.MeshBasicMaterial({ color: 0xffd98a, transparent: true, opacity: 0, depthWrite: false });
+    const pools = new THREE.InstancedMesh(new THREE.CircleGeometry(4, 12), poolMat, spots.length);
+    spots.forEach((s, i) => { dm.position.set(s.x, 0.05, s.z); dm.rotation.set(-Math.PI / 2, 0, 0); dm.scale.set(1, 1, 1); dm.updateMatrix(); pools.setMatrixAt(i, dm.matrix); });
+    group.add(pools);
+    group.userData.pool = poolMat;
   }
   {
     const umbRng = rng.fork('beach');
@@ -574,10 +591,10 @@ export function buildCity(scene, plan, collision, rng) {
   group.userData.ot = ot;
   group.userData.wheel = wheel;
   function update(time, nightFactor) {
-    fm.emissiveIntensity = nightFactor * 0.95;
+    fm.emissiveIntensity = 0.35 + nightFactor * 0.65;
     sm.emissiveIntensity = 0.25 + nightFactor * 0.75;
-    const lg = group.userData.lg;
-    if (lg) lg.opacity = nightFactor * 0.9;
+    const pm = group.userData.pool;
+    if (pm) pm.opacity = nightFactor * 0.22;
     ot.offset.x = (time * 0.004) % 1;
     ot.offset.y = (time * 0.002) % 1;
     wheel.rotation.z = time * 0.12;
